@@ -44,11 +44,24 @@ export interface LabyrinthSave {
   shortcutOpened: boolean;
 }
 
+export interface FrontierSave {
+  activeBeacon: number;
+  activatedBeacons: boolean[];
+  openedCaches: boolean[];
+  riftglassShards: number;
+  tonics: number;
+  weaponLevel: number;
+  floorGuardianDefeated: boolean;
+  ascensionUnlocked: boolean;
+  ascentWitnessed: boolean;
+}
+
 export interface SaveData {
   version: number;
   settings: GameSettings;
   quest: QuestSave;
   labyrinth: LabyrinthSave;
+  frontier: FrontierSave;
   player: {
     health: number;
     focus: number;
