@@ -85,6 +85,31 @@ const applyEmergencyGpuBudget = (game: any): void => {
   }
 };
 
+const installFloorTwoSafety = (game: any, floorTwo: FloorTwoArrivalDirector): void => {
+  const state = floorTwo as any;
+  const playerUpdate = game.player.update.bind(game.player);
+  game.player.update = (...args: any[]): void => {
+    if (state.upperActive && game.player.root.position.y < state.upperFloorY - 18) {
+      state.upperActive = false;
+      state.objective?.classList.remove("visible");
+      game.expedition.liftActive = false;
+      game.expedition.liftAtTop = false;
+      game.expedition.liftTime = 0;
+      game.expedition.completionReported = false;
+      game.expedition.liftRoot.position.y = game.expedition.liftBaseY;
+    }
+    playerUpdate(...args);
+  };
+
+  for (const mesh of game.world.scene.meshes) {
+    const name = String(mesh.name ?? "");
+    if (name === "floor-two-arrival-terrace" || name.includes("floor-two-") && name.includes("-rail-")) {
+      mesh.metadata = { ...(mesh.metadata ?? {}), cameraCollision: true };
+      mesh.isPickable = true;
+    }
+  }
+};
+
 const boot = async (): Promise<void> => {
   const canvas = getCanvas();
   const status = document.getElementById("boot-status");
@@ -101,7 +126,8 @@ const boot = async (): Promise<void> => {
     applyEmergencyGpuBudget(game);
     new PerformanceDirector(engine, game.world, renderer);
     new CombatFeelDirector(game, engine);
-    new FloorTwoArrivalDirector(game);
+    const floorTwo = new FloorTwoArrivalDirector(game);
+    installFloorTwoSafety(game, floorTwo);
     game.run();
   } catch (error) {
     console.error(error);
