@@ -149,6 +149,7 @@ export class RiftBoar implements Damageable {
     this.state = state;
     this.stateTime = 0;
     this.attackConnected = false;
+    if (state === "windup") this.audio.creatureCharge();
   }
 
   private lerpAngle(current: number, target: number, amount: number): number {
