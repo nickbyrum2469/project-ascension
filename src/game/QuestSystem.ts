@@ -1,8 +1,21 @@
-import type { GameSettings, LabyrinthSave, QuestSave, SaveData } from "../data/GameTypes.js";
+import type {
+  FrontierSave,
+  GameSettings,
+  LabyrinthSave,
+  QuestSave,
+  SaveData
+} from "../data/GameTypes.js";
 import type { Hud } from "../ui/Hud.js";
 import type { AudioDirector } from "../audio/AudioDirector.js";
 
 const STORAGE_KEY = "project-ascension-save-v1";
+
+export interface CacheReward {
+  shards: number;
+  tonic: boolean;
+  weaponLevel: number;
+  levelIncreased: boolean;
+}
 
 const defaultQuest = (): QuestSave => ({
   accepted: false,
@@ -19,6 +32,18 @@ const defaultLabyrinth = (): LabyrinthSave => ({
   guardianDefeated: false,
   coreRestored: false,
   shortcutOpened: false
+});
+
+const defaultFrontier = (): FrontierSave => ({
+  activeBeacon: 0,
+  activatedBeacons: [true, false, false, false],
+  openedCaches: [false, false, false, false, false, false],
+  riftglassShards: 0,
+  tonics: 1,
+  weaponLevel: 1,
+  floorGuardianDefeated: false,
+  ascensionUnlocked: false,
+  ascentWitnessed: false
 });
 
 const defaultSettings = (): GameSettings => ({
@@ -130,9 +155,74 @@ export class QuestSystem {
     this.save.labyrinth.shortcutOpened = true;
     this.save.player.focus = 100;
     this.persistAndRefresh();
-    this.hud.notify("PILLAR CORE RESTORED", "A permanent return route to Caelus Reach has opened.");
+    this.hud.notify("PILLAR CORE RESTORED", "Foundation beacons across the first ring are waking up.");
     this.audio.quest();
     return true;
+  }
+
+  public activateBeacon(index: number): boolean {
+    if (index < 0 || index >= this.save.frontier.activatedBeacons.length) return false;
+    const newlyActivated = !this.save.frontier.activatedBeacons[index];
+    this.save.frontier.activatedBeacons[index] = true;
+    this.save.frontier.activeBeacon = index;
+    this.persistAndRefresh();
+    this.hud.notify(
+      newlyActivated ? "FOUNDATION BEACON AWAKENED" : "CHECKPOINT UPDATED",
+      `Respawn anchor synchronized to beacon ${index + 1}.`
+    );
+    this.audio.quest();
+    return true;
+  }
+
+  public claimCache(index: number): CacheReward | null {
+    if (index < 0 || index >= this.save.frontier.openedCaches.length) return null;
+    if (this.save.frontier.openedCaches[index]) return null;
+
+    const shards = index % 3 === 2 ? 2 : 1;
+    const tonic = index % 2 === 1;
+    const previousLevel = this.save.frontier.weaponLevel;
+    this.save.frontier.openedCaches[index] = true;
+    this.save.frontier.riftglassShards += shards;
+    if (tonic) this.save.frontier.tonics += 1;
+    this.save.frontier.weaponLevel = Math.min(4, 1 + Math.floor(this.save.frontier.riftglassShards / 3));
+    this.persistAndRefresh();
+    this.audio.quest();
+
+    return {
+      shards,
+      tonic,
+      weaponLevel: this.save.frontier.weaponLevel,
+      levelIncreased: this.save.frontier.weaponLevel > previousLevel
+    };
+  }
+
+  public consumeTonic(): boolean {
+    if (this.save.frontier.tonics <= 0) return false;
+    this.save.frontier.tonics -= 1;
+    this.persistAndRefresh();
+    return true;
+  }
+
+  public recordFloorGuardianDefeat(): void {
+    if (this.save.frontier.floorGuardianDefeated) return;
+    this.save.frontier.floorGuardianDefeated = true;
+    this.save.frontier.ascensionUnlocked = true;
+    this.save.player.focus = 100;
+    this.persistAndRefresh();
+    this.hud.notify("FIRST RING CONQUERED", "The northern ascent dais has opened.");
+    this.audio.quest();
+  }
+
+  public witnessAscent(): void {
+    if (!this.save.frontier.ascensionUnlocked || this.save.frontier.ascentWitnessed) return;
+    this.save.frontier.ascentWitnessed = true;
+    this.persistAndRefresh();
+    this.hud.notify("ASCENSION ROUTE STABILIZED", "Floor Two now waits beyond the pillar crown.");
+    this.audio.quest();
+  }
+
+  public weaponDamageMultiplier(): number {
+    return 1 + (this.save.frontier.weaponLevel - 1) * 0.16;
   }
 
   public updateSettings(settings: GameSettings): void {
@@ -152,11 +242,13 @@ export class QuestSystem {
       if (!raw) return this.defaults();
       const parsed = JSON.parse(raw) as Partial<SaveData>;
       const parsedSigils = parsed.labyrinth?.sigilsActivated ?? [];
+      const parsedBeacons = parsed.frontier?.activatedBeacons ?? [];
+      const parsedCaches = parsed.frontier?.openedCaches ?? [];
       const migratedGuardianDefeat = parsed.labyrinth?.guardianDefeated
         ?? parsed.labyrinth?.coreRestored
         ?? false;
       return {
-        version: 4,
+        version: 5,
         settings: { ...defaultSettings(), ...(parsed.settings ?? {}) },
         quest: { ...defaultQuest(), ...(parsed.quest ?? {}) },
         labyrinth: {
@@ -164,6 +256,12 @@ export class QuestSystem {
           ...(parsed.labyrinth ?? {}),
           sigilsActivated: [0, 1, 2].map((index) => parsedSigils[index] ?? false),
           guardianDefeated: migratedGuardianDefeat
+        },
+        frontier: {
+          ...defaultFrontier(),
+          ...(parsed.frontier ?? {}),
+          activatedBeacons: [0, 1, 2, 3].map((index) => parsedBeacons[index] ?? index === 0),
+          openedCaches: [0, 1, 2, 3, 4, 5].map((index) => parsedCaches[index] ?? false)
         },
         player: {
           health: parsed.player?.health ?? 100,
@@ -178,10 +276,11 @@ export class QuestSystem {
 
   private defaults(): SaveData {
     return {
-      version: 4,
+      version: 5,
       settings: defaultSettings(),
       quest: defaultQuest(),
       labyrinth: defaultLabyrinth(),
+      frontier: defaultFrontier(),
       player: {
         health: 100,
         focus: 0,
@@ -191,7 +290,7 @@ export class QuestSystem {
   }
 
   private refreshHud(): void {
-    this.hud.updateQuest(this.save.quest, this.save.labyrinth);
+    this.hud.updateQuest(this.save.quest, this.save.labyrinth, this.save.frontier);
   }
 
   private persistAndRefresh(): void {
