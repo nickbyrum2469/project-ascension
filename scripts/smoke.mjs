@@ -8,6 +8,7 @@ const requiredFiles = [
   "src/core/FloorTwoArrivalDirector.ts",
   "src/core/FrontierContractDirector.ts",
   "src/core/PerformanceDirector.ts",
+  "src/core/VisualRecoveryDirector.ts",
   "src/game/Game.ts",
   "src/game/Player.ts",
   "src/game/QuestSystem.ts",
@@ -36,6 +37,7 @@ const sourceFiles = await Promise.all([
   "src/core/FloorTwoArrivalDirector.ts",
   "src/core/FrontierContractDirector.ts",
   "src/core/PerformanceDirector.ts",
+  "src/core/VisualRecoveryDirector.ts",
   "src/data/GameTypes.ts",
   "src/game/Game.ts",
   "src/game/Player.ts",
@@ -129,7 +131,17 @@ for (const requiredFeature of [
   "this.quests.recordenemydefeat =",
   "this.quests.activatebeacon =",
   "this.quests.claimcache =",
-  "expedition.contracts = state"
+  "expedition.contracts = state",
+  "new visualrecoverydirector",
+  "third-person-sword-direction-fix",
+  "first-person-sword-direction-fix",
+  "terrain.bumptexture = null",
+  "caelus-south-wall-infill-left",
+  "caelus-south-wall-infill-right",
+  "caelus-gatehouse-buttress",
+  "spawn-trail-pavers-batch",
+  "spawn-trail-verge-batch",
+  "spawn-trail-markers-batch"
 ]) {
   if (!productionSource.includes(requiredFeature)) {
     throw new Error(`Missing required production feature: ${requiredFeature}`);
@@ -191,21 +203,49 @@ if (contractSource.includes("onBeforeRenderObservable")) {
 if (!contractSource.includes("recordEnemyDefeat(kind);\n      this.recordEnemyProgress(kind);")) {
   throw new Error("Contract kill progress must run after the canonical enemy reward method.");
 }
-if (!contractSource.includes("if (claimed && !id.startsWith(\"contract-reward-\"))")) {
+if (!contractSource.includes('if (claimed && !id.startsWith("contract-reward-"))')) {
   throw new Error("Survey progress must ignore synthetic contract reward cache identifiers.");
+}
+
+const visualSource = await readFile("src/core/VisualRecoveryDirector.ts", "utf8");
+for (const requiredVisualRule of [
+  'terrain.bumpTexture = null',
+  'name.startsWith("foundation-rib-")',
+  'mesh.setEnabled(false)',
+  'new BABYLON.Vector3(Math.PI, 0, 0)',
+  'directionCorrected: true',
+  'collisionBoxes?.push',
+  'spawn-trail-pavers-batch',
+  'spawn-trail-verge-batch',
+  'spawn-trail-markers-batch'
+]) {
+  if (!visualSource.includes(requiredVisualRule)) {
+    throw new Error(`Missing visual recovery rule: ${requiredVisualRule}`);
+  }
+}
+if (visualSource.includes("onBeforeRenderObservable")) {
+  throw new Error("Visual recovery must remain a one-time authored correction without another frame callback.");
 }
 
 const mainSource = await readFile("src/main.ts", "utf8");
 const arrivalIndex = mainSource.indexOf("new FloorTwoArrivalDirector(game)");
 const safetyIndex = mainSource.indexOf("installFloorTwoSafety(game, floorTwo)");
 const contractIndex = mainSource.indexOf("new FrontierContractDirector(game)");
+const visualIndex = mainSource.indexOf("new VisualRecoveryDirector(game)");
 const batchIndex = mainSource.indexOf("consolidateFloorTwoStaticGeometry(game)");
 const performanceIndex = mainSource.indexOf("new PerformanceDirector(engine, game.world, renderer)");
+const combatIndex = mainSource.indexOf("new CombatFeelDirector(game, engine)");
 if (arrivalIndex < 0 || safetyIndex <= arrivalIndex) {
   throw new Error("Floor Two safety must wrap the player after the arrival director installs its upper movement surface.");
 }
-if (contractIndex <= safetyIndex || batchIndex <= contractIndex || performanceIndex <= batchIndex) {
-  throw new Error("Contract interaction must wrap Floor Two before batching and global performance initialization.");
+if (
+  contractIndex <= safetyIndex
+  || visualIndex <= contractIndex
+  || batchIndex <= visualIndex
+  || performanceIndex <= batchIndex
+  || combatIndex <= performanceIndex
+) {
+  throw new Error("Visual recovery must run after gameplay extensions and before static freezing, performance setup, and combat trails.");
 }
 if (!mainSource.includes('name === "floor-two-arrival-terrace"') || !mainSource.includes('name.includes("-rail-")')) {
   throw new Error("Visible Floor Two floor and rail geometry must participate in camera collision.");
@@ -230,4 +270,4 @@ for (const asset of manifest.assets) {
   }
 }
 
-console.log("Project Ascension frontier contract production checks passed.");
+console.log("Project Ascension visual recovery production checks passed.");
