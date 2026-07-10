@@ -2,6 +2,7 @@ import "./styles.css";
 import "./combat-presentation.css";
 import * as BabylonModule from "babylonjs";
 import { RouteAudioDirector } from "./audio/RouteAudioDirector.js";
+import { CaelusPhaseZeroDirector } from "./core/CaelusPhaseZeroDirector.js";
 import { CameraSafetyDirector } from "./core/CameraSafetyDirector.js";
 import { CombatFeelDirector } from "./core/CombatFeelDirector.js";
 import { CombatPresentationDirector } from "./core/CombatPresentationDirector.js";
@@ -185,6 +186,7 @@ const boot = async (): Promise<void> => {
     applyEmergencyGpuBudget(game);
     new VisualRecoveryDirector(game);
     new VerticalSliceDirector(game);
+    new CaelusPhaseZeroDirector(game);
     new VerticalSliceActorRebase(game);
     const floorTwo = new FloorTwoArrivalDirector(game);
     installFloorTwoSafety(game, floorTwo);
