@@ -53,7 +53,7 @@ export class FoundryLabyrinth {
       unlocked: false,
       entered: false,
       sigilsActivated: [false, false, false],
-      sentinelDefeated: false,
+      guardianDefeated: false,
       coreRestored: false,
       shortcutOpened: false
     };
