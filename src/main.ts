@@ -39,13 +39,15 @@ const createEngine = async (canvas: HTMLCanvasElement): Promise<{ engine: any; r
 
 const installAirborneCollisionGuard = async (): Promise<void> => {
   const { World } = await import("./world/World.js");
-  const prototype = World.prototype as World["resolvePlayerPosition"] extends (...args: infer T) => unknown
-    ? typeof World.prototype & { __airborneCollisionGuard?: boolean; resolvePlayerPosition: (...args: T) => void }
-    : typeof World.prototype & { __airborneCollisionGuard?: boolean };
+  const prototype = World.prototype as any;
   if (prototype.__airborneCollisionGuard) return;
 
   const resolve = prototype.resolvePlayerPosition;
-  prototype.resolvePlayerPosition = function resolveWithoutFlatteningJumps(position: any, previous: any): void {
+  prototype.resolvePlayerPosition = function resolveWithoutFlatteningJumps(
+    this: any,
+    position: any,
+    previous: any
+  ): void {
     const airborneHeight = position.y;
     resolve.call(this, position, previous);
     const ground = this.heightAt(position.x, position.z);
