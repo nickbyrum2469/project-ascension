@@ -16,6 +16,7 @@ const defaultLabyrinth = (): LabyrinthSave => ({
   unlocked: false,
   entered: false,
   sigilsActivated: [false, false, false],
+  guardianDefeated: false,
   coreRestored: false,
   shortcutOpened: false
 });
@@ -103,6 +104,15 @@ export class QuestSystem {
     return true;
   }
 
+  public recordGuardianDefeat(): void {
+    if (this.save.labyrinth.guardianDefeated) return;
+    this.save.labyrinth.guardianDefeated = true;
+    this.save.player.focus = Math.max(this.save.player.focus, 70);
+    this.persistAndRefresh();
+    this.hud.notify("SENTINEL DISMANTLED", "The Foundry pillar core is no longer defended.");
+    this.audio.quest();
+  }
+
   public activeSigilCount(): number {
     return this.save.labyrinth.sigilsActivated.filter(Boolean).length;
   }
@@ -110,6 +120,7 @@ export class QuestSystem {
   public canRestoreCore(): boolean {
     return this.save.labyrinth.unlocked
       && this.activeSigilCount() >= 3
+      && this.save.labyrinth.guardianDefeated
       && !this.save.labyrinth.coreRestored;
   }
 
@@ -141,14 +152,18 @@ export class QuestSystem {
       if (!raw) return this.defaults();
       const parsed = JSON.parse(raw) as Partial<SaveData>;
       const parsedSigils = parsed.labyrinth?.sigilsActivated ?? [];
+      const migratedGuardianDefeat = parsed.labyrinth?.guardianDefeated
+        ?? parsed.labyrinth?.coreRestored
+        ?? false;
       return {
-        version: 3,
+        version: 4,
         settings: { ...defaultSettings(), ...(parsed.settings ?? {}) },
         quest: { ...defaultQuest(), ...(parsed.quest ?? {}) },
         labyrinth: {
           ...defaultLabyrinth(),
           ...(parsed.labyrinth ?? {}),
-          sigilsActivated: [0, 1, 2].map((index) => parsedSigils[index] ?? false)
+          sigilsActivated: [0, 1, 2].map((index) => parsedSigils[index] ?? false),
+          guardianDefeated: migratedGuardianDefeat
         },
         player: {
           health: parsed.player?.health ?? 100,
@@ -163,7 +178,7 @@ export class QuestSystem {
 
   private defaults(): SaveData {
     return {
-      version: 3,
+      version: 4,
       settings: defaultSettings(),
       quest: defaultQuest(),
       labyrinth: defaultLabyrinth(),
