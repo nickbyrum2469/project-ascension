@@ -87,7 +87,7 @@ export class QuestSystem {
     if (!this.save.labyrinth.unlocked || this.save.labyrinth.entered) return;
     this.save.labyrinth.entered = true;
     this.persistAndRefresh();
-    this.hud.notify("FOUNDry LABYRINTH", "Three dormant sigils are feeding a sealed pillar core.");
+    this.hud.notify("FOUNDRY LABYRINTH", "Three dormant sigils are feeding a sealed pillar core.");
     this.audio.quest();
   }
 
