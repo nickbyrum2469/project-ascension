@@ -1,5 +1,6 @@
 import "./styles.css";
 import * as BabylonModule from "babylonjs";
+import { CombatFeelDirector } from "./core/CombatFeelDirector.js";
 import { PerformanceDirector } from "./core/PerformanceDirector.js";
 import { ExpeditionJournal } from "./ui/ExpeditionJournal.js";
 import { LoadoutOverlay } from "./ui/LoadoutOverlay.js";
@@ -98,6 +99,7 @@ const boot = async (): Promise<void> => {
     game.world.mara.root.position.y += 0.31;
     applyEmergencyGpuBudget(game);
     new PerformanceDirector(engine, game.world, renderer);
+    new CombatFeelDirector(game, engine);
     game.run();
   } catch (error) {
     console.error(error);
