@@ -24,7 +24,7 @@ const charmName = (charm: Charm): string => charm === "sentinel"
     : "Unattuned";
 
 export class LoadoutOverlay {
-  private readonly strip: HTMLElement;
+  private readonly strip: HTMLButtonElement;
   private readonly panel: HTMLElement;
   private readonly content: HTMLElement;
   private open = false;
