@@ -8,6 +8,8 @@ const requiredFiles = [
   "src/core/FloorTwoArrivalDirector.ts",
   "src/core/FrontierContractDirector.ts",
   "src/core/PerformanceDirector.ts",
+  "src/core/VisualRecoveryDirector.ts",
+  "src/core/VisualPolishDirector.ts",
   "src/game/Game.ts",
   "src/game/Player.ts",
   "src/game/QuestSystem.ts",
@@ -36,6 +38,8 @@ const sourceFiles = await Promise.all([
   "src/core/FloorTwoArrivalDirector.ts",
   "src/core/FrontierContractDirector.ts",
   "src/core/PerformanceDirector.ts",
+  "src/core/VisualRecoveryDirector.ts",
+  "src/core/VisualPolishDirector.ts",
   "src/data/GameTypes.ts",
   "src/game/Game.ts",
   "src/game/Player.ts",
@@ -129,7 +133,29 @@ for (const requiredFeature of [
   "this.quests.recordenemydefeat =",
   "this.quests.activatebeacon =",
   "this.quests.claimcache =",
-  "expedition.contracts = state"
+  "expedition.contracts = state",
+  "new visualrecoverydirector",
+  "third-person-sword-direction-fix",
+  "first-person-sword-direction-fix",
+  "terrain.bumptexture = null",
+  "caelus-south-wall-infill-left",
+  "caelus-south-wall-infill-right",
+  "caelus-gatehouse-buttress",
+  "spawn-trail-pavers-batch",
+  "spawn-trail-verge-batch",
+  "spawn-trail-markers-batch",
+  "new visualpolishdirector",
+  "clearcentralgatecollision",
+  "frontier-path-stone-a-batch",
+  "frontier-path-stone-b-batch",
+  "caelus-cobble-a-batch",
+  "caelus-cobble-b-batch",
+  "caelus-cobble-curb-batch",
+  "frontier-route-bush-a-batch",
+  "frontier-route-bush-b-batch",
+  "frontier-route-rock-batch",
+  "frontier-route-fence-batch",
+  "addexcludedmesh"
 ]) {
   if (!productionSource.includes(requiredFeature)) {
     throw new Error(`Missing required production feature: ${requiredFeature}`);
@@ -191,21 +217,87 @@ if (contractSource.includes("onBeforeRenderObservable")) {
 if (!contractSource.includes("recordEnemyDefeat(kind);\n      this.recordEnemyProgress(kind);")) {
   throw new Error("Contract kill progress must run after the canonical enemy reward method.");
 }
-if (!contractSource.includes("if (claimed && !id.startsWith(\"contract-reward-\"))")) {
+if (!contractSource.includes('if (claimed && !id.startsWith("contract-reward-"))')) {
   throw new Error("Survey progress must ignore synthetic contract reward cache identifiers.");
+}
+
+const visualSource = await readFile("src/core/VisualRecoveryDirector.ts", "utf8");
+for (const requiredVisualRule of [
+  'terrain.bumpTexture = null',
+  'name.startsWith("foundation-rib-")',
+  'mesh.setEnabled(false)',
+  'new BABYLON.Vector3(Math.PI / 2, 0, -0.18)',
+  'new BABYLON.Vector3(0, 0.6, 0.25)',
+  'new BABYLON.Vector3(-0.25, -0.84, 0.04)',
+  'directionCorrected: true',
+  'collisionBoxes?.push',
+  'const z = -6 - index * 4.45',
+  'spawn-trail-pavers-batch',
+  'spawn-trail-verge-batch',
+  'spawn-trail-markers-batch',
+  'caelus-window-light-batch',
+  'caelus-market-wood-batch',
+  'caelus-plaza-monument'
+]) {
+  if (!visualSource.includes(requiredVisualRule)) {
+    throw new Error(`Missing visual recovery rule: ${requiredVisualRule}`);
+  }
+}
+if (visualSource.includes("spawn-shrub-")) {
+  throw new Error("Malformed polyhedron shrubs must not return to the spawn route.");
+}
+if (visualSource.includes("onBeforeRenderObservable")) {
+  throw new Error("Visual recovery must remain a one-time authored correction without another frame callback.");
+}
+
+const polishSource = await readFile("src/core/VisualPolishDirector.ts", "utf8");
+for (const requiredPolishRule of [
+  'this.clearCentralGateCollision()',
+  'box.minX < 5',
+  'box.maxX > -5',
+  'box.minZ < 27',
+  'box.maxZ > 14',
+  'boxes.splice(index, 1)',
+  'mesh.setEnabled(false)',
+  'for (let index = 0; index < 40; index += 1)',
+  'frontier-path-stone-a-batch',
+  'caelus-cobble-a-batch',
+  'frontier-route-bush-a-batch',
+  'frontier-route-fence-batch',
+  'material.disableLighting = true',
+  'material.diffuseColor = BABYLON.Color3.Black()',
+  'material.emissiveColor = BABYLON.Color3.FromHexString(hex)',
+  'this.world.glowLayer?.addExcludedMesh?.(merged)'
+]) {
+  if (!polishSource.includes(requiredPolishRule)) {
+    throw new Error(`Missing final visual polish rule: ${requiredPolishRule}`);
+  }
+}
+if (polishSource.includes("onBeforeRenderObservable")) {
+  throw new Error("Final visual polish must remain static and must not add another frame callback.");
 }
 
 const mainSource = await readFile("src/main.ts", "utf8");
 const arrivalIndex = mainSource.indexOf("new FloorTwoArrivalDirector(game)");
 const safetyIndex = mainSource.indexOf("installFloorTwoSafety(game, floorTwo)");
 const contractIndex = mainSource.indexOf("new FrontierContractDirector(game)");
+const visualIndex = mainSource.indexOf("new VisualRecoveryDirector(game)");
+const polishIndex = mainSource.indexOf("new VisualPolishDirector(game)");
 const batchIndex = mainSource.indexOf("consolidateFloorTwoStaticGeometry(game)");
 const performanceIndex = mainSource.indexOf("new PerformanceDirector(engine, game.world, renderer)");
+const combatIndex = mainSource.indexOf("new CombatFeelDirector(game, engine)");
 if (arrivalIndex < 0 || safetyIndex <= arrivalIndex) {
   throw new Error("Floor Two safety must wrap the player after the arrival director installs its upper movement surface.");
 }
-if (contractIndex <= safetyIndex || batchIndex <= contractIndex || performanceIndex <= batchIndex) {
-  throw new Error("Contract interaction must wrap Floor Two before batching and global performance initialization.");
+if (
+  contractIndex <= safetyIndex
+  || visualIndex <= contractIndex
+  || polishIndex <= visualIndex
+  || batchIndex <= polishIndex
+  || performanceIndex <= batchIndex
+  || combatIndex <= performanceIndex
+) {
+  throw new Error("Visual recovery and final polish must run before static freezing, performance setup, and combat trails.");
 }
 if (!mainSource.includes('name === "floor-two-arrival-terrace"') || !mainSource.includes('name.includes("-rail-")')) {
   throw new Error("Visible Floor Two floor and rail geometry must participate in camera collision.");
@@ -230,4 +322,4 @@ for (const asset of manifest.assets) {
   }
 }
 
-console.log("Project Ascension frontier contract production checks passed.");
+console.log("Project Ascension visual playtest recovery checks passed.");

@@ -4,6 +4,8 @@ import { CombatFeelDirector } from "./core/CombatFeelDirector.js";
 import { FloorTwoArrivalDirector } from "./core/FloorTwoArrivalDirector.js";
 import { FrontierContractDirector } from "./core/FrontierContractDirector.js";
 import { PerformanceDirector } from "./core/PerformanceDirector.js";
+import { VisualPolishDirector } from "./core/VisualPolishDirector.js";
+import { VisualRecoveryDirector } from "./core/VisualRecoveryDirector.js";
 import { ExpeditionJournal } from "./ui/ExpeditionJournal.js";
 import { LoadoutOverlay } from "./ui/LoadoutOverlay.js";
 
@@ -175,6 +177,8 @@ const boot = async (): Promise<void> => {
     const floorTwo = new FloorTwoArrivalDirector(game);
     installFloorTwoSafety(game, floorTwo);
     new FrontierContractDirector(game);
+    new VisualRecoveryDirector(game);
+    new VisualPolishDirector(game);
     consolidateFloorTwoStaticGeometry(game);
     new PerformanceDirector(engine, game.world, renderer);
     new CombatFeelDirector(game, engine);
