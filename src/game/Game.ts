@@ -1,7 +1,11 @@
-import { AudioDirector } from "../audio/AudioDirector.js";
+import { AudioDirector, type AmbienceRegion } from "../audio/AudioDirector.js";
 import { InputManager } from "../core/InputManager.js";
 import type { InputFrame } from "../data/GameTypes.js";
 import { Hud } from "../ui/Hud.js";
+import {
+  ExpeditionLayer,
+  type ExpeditionInteraction
+} from "../world/ExpeditionLayer.js";
 import { FoundryLabyrinth } from "../world/FoundryLabyrinth.js";
 import { World } from "../world/World.js";
 import { Player } from "./Player.js";
@@ -42,11 +46,14 @@ export class Game {
   private readonly player: Player;
   private readonly enemies: RiftBoar[];
   private readonly labyrinth: FoundryLabyrinth;
+  private readonly expedition: ExpeditionLayer;
   private readonly effects: TransientEffect[] = [];
   private started = false;
   private paused = false;
   private lastFrame = performance.now();
   private elapsed = 0;
+  private ambienceRegion: AmbienceRegion = "windscar";
+  private ascentCinematicTime = 0;
 
   constructor(
     private readonly engine: any,
@@ -58,6 +65,11 @@ export class Game {
     this.quests = new QuestSystem(this.hud, this.audio);
     this.labyrinth = new FoundryLabyrinth(this.world);
     this.labyrinth.setProgress(this.quests.save.labyrinth);
+    this.expedition = new ExpeditionLayer(this.world);
+    this.expedition.setProgress(
+      this.quests.save.expedition,
+      this.quests.save.labyrinth.coreRestored
+    );
     this.player = new Player(
       this.world,
       this.hud,
@@ -65,15 +77,7 @@ export class Game {
       this.quests,
       (position, heavy) => this.spawnImpact(position, heavy)
     );
-    this.enemies = this.world.spawnPoints.map((point, index) => new RiftBoar(
-      this.world,
-      point.clone(),
-      index,
-      this.audio,
-      this.quests,
-      (amount, source) => this.player.receiveDamage(amount, source),
-      (position, heavy) => this.spawnImpact(position, heavy)
-    ));
+    this.enemies = this.world.spawnPoints.map((_, index) => this.createEnemy(index));
 
     this.hud.setRenderer(rendererName);
     this.hud.setBootStatus("Foundation lattice synchronized. Field entry ready.");
@@ -111,7 +115,15 @@ export class Game {
 
     this.hud.resumeButton.addEventListener("click", () => this.setPaused(false));
     this.canvas.addEventListener("click", () => {
-      if (this.started && !this.paused && !this.hud.isDialogueOpen()) this.input.requestPointerLock();
+      if (
+        this.started
+        && !this.paused
+        && !this.hud.isDialogueOpen()
+        && !this.expedition.isLiftActive()
+        && this.ascentCinematicTime <= 0
+      ) {
+        this.input.requestPointerLock();
+      }
     });
   }
 
@@ -122,7 +134,12 @@ export class Game {
       this.setPaused(!this.paused);
     }
 
-    const controlsEnabled = this.started && !this.paused && !this.hud.isDialogueOpen();
+    const liftLocked = this.expedition.isLiftActive();
+    const controlsEnabled = this.started
+      && !this.paused
+      && !this.hud.isDialogueOpen()
+      && !liftLocked
+      && this.ascentCinematicTime <= 0;
     this.player.update(delta, sampled, this.enemies, controlsEnabled);
 
     if (controlsEnabled) {
@@ -132,6 +149,28 @@ export class Game {
       this.hud.setInteraction(null);
     }
 
+    if (!this.paused && this.expedition.updateLift(delta, this.player.root)) {
+      this.quests.completeAscent();
+      this.expedition.setProgress(
+        this.quests.save.expedition,
+        this.quests.save.labyrinth.coreRestored
+      );
+      this.spawnImpact(this.player.position().add(new BABYLON.Vector3(0, 1.5, 0)), true);
+      this.spawnImpact(this.player.position().add(new BABYLON.Vector3(0, 4.5, -4)), true);
+      this.ascentCinematicTime = 3.4;
+      this.hud.notify(
+        "FLOOR TWO THRESHOLD",
+        "The seal above is stable but remains closed. Recording the staging route before descent."
+      );
+    }
+
+    if (!this.paused && this.ascentCinematicTime > 0) {
+      this.ascentCinematicTime = Math.max(0, this.ascentCinematicTime - delta);
+      if (this.ascentCinematicTime === 0) this.finishAscentCycle();
+    }
+
+    this.expedition.update(delta, this.player.position());
+    this.updateAmbience();
     this.animateWorld(delta);
     this.updateEffects(delta);
   }
@@ -195,11 +234,20 @@ export class Game {
           this.hud.setInteraction("Restore the buried pillar core");
           if (input.interactPressed && this.quests.restoreCore()) {
             this.labyrinth.setProgress(this.quests.save.labyrinth);
+            this.expedition.setProgress(
+              this.quests.save.expedition,
+              this.quests.save.labyrinth.coreRestored
+            );
             this.spawnImpact(this.labyrinth.corePosition.add(new BABYLON.Vector3(0, 3.2, 0)), true);
             this.spawnImpact(this.labyrinth.corePosition.add(new BABYLON.Vector3(0, 5.2, 0)), true);
           }
         } else {
-          this.hud.setInteraction(`Pillar core sealed — ${this.quests.activeSigilCount()}/3 relays active`);
+          const guardianStatus = labyrinthSave.guardianDefeated
+            ? "guardian defeated"
+            : "Sentinel still active";
+          this.hud.setInteraction(
+            `Pillar core sealed — ${this.quests.activeSigilCount()}/3 relays, ${guardianStatus}`
+          );
         }
         return;
       }
@@ -214,13 +262,85 @@ export class Game {
       }
     }
 
+    const expeditionInteraction = this.expedition.nearestInteraction(
+      playerPosition,
+      this.quests.save.expedition,
+      labyrinthSave.coreRestored
+    );
+    if (expeditionInteraction) {
+      this.handleExpeditionInteraction(expeditionInteraction, input);
+      return;
+    }
+
     this.hud.setInteraction(null);
+  }
+
+  private handleExpeditionInteraction(
+    interaction: ExpeditionInteraction,
+    input: InputFrame
+  ): void {
+    this.hud.setInteraction(interaction.label);
+    if (!input.interactPressed) return;
+
+    if (interaction.kind === "beacon") {
+      const displayName = this.expedition.getBeaconName(interaction.id);
+      this.quests.activateBeacon(interaction.id, displayName);
+      this.player.health = this.player.maxHealth;
+      this.player.stamina = 100;
+      this.player.focus = Math.max(this.player.focus, 55);
+      this.quests.updatePlayer(this.player.health, this.player.focus);
+      this.respawnOutdoorEnemies();
+      this.expedition.setProgress(
+        this.quests.save.expedition,
+        this.quests.save.labyrinth.coreRestored
+      );
+      this.spawnImpact(this.player.position().add(new BABYLON.Vector3(0, 1.35, 0)), true);
+      return;
+    }
+
+    if (interaction.kind === "cache") {
+      if (this.quests.claimCache(interaction.id)) {
+        this.expedition.setProgress(
+          this.quests.save.expedition,
+          this.quests.save.labyrinth.coreRestored
+        );
+        this.spawnImpact(this.player.position().add(new BABYLON.Vector3(0, 1.05, 0)), false);
+      }
+      return;
+    }
+
+    if (interaction.kind === "citizen" && interaction.citizenIndex !== undefined) {
+      this.openCitizenDialogue(interaction.citizenIndex);
+      return;
+    }
+
+    if (interaction.kind === "lift" && this.expedition.startLift()) {
+      this.input.releasePointerLock();
+      this.audio.quest();
+      this.hud.notify(
+        "EASTERN PILLAR LIFT",
+        "Foundation clamps engaged. Ascending toward the sealed Floor Two threshold."
+      );
+    }
+  }
+
+  private openCitizenDialogue(index: number): void {
+    const citizen = this.expedition.getCitizen(index);
+    if (!citizen) return;
+    this.input.releasePointerLock();
+    this.hud.showDialogue(
+      citizen.name,
+      citizen.initials,
+      `${citizen.role} — ${citizen.line}`,
+      [{ label: "Safe roads.", action: () => this.closeDialogue() }]
+    );
   }
 
   private openMaraDialogue(): void {
     this.input.releasePointerLock();
     const quest = this.quests.save.quest;
     const labyrinth = this.quests.save.labyrinth;
+    const expedition = this.quests.save.expedition;
     if (!quest.accepted) {
       this.hud.showDialogue(
         "Mara Venn",
@@ -267,12 +387,22 @@ export class Game {
       return;
     }
 
+    if (expedition.ascentCompleted) {
+      this.hud.showDialogue(
+        "Mara Venn",
+        "MV",
+        `You reached the sealed threshold beneath Floor Two. The city counted eight full lift cycles before your signal returned. We have ${expedition.riftglassShards} recovered Riftglass shard${expedition.riftglassShards === 1 ? "" : "s"} and a stable route for the next expedition phase.`,
+        [{ label: "We prepare for the next floor.", action: () => this.closeDialogue() }]
+      );
+      return;
+    }
+
     if (labyrinth.coreRestored) {
       this.hud.showDialogue(
         "Mara Venn",
         "MV",
-        "The eastern pillar is carrying power again. We can feel its rhythm through every foundation stone in Caelus Reach. You did more than clear a ruin—you opened the first permanent route toward the floor above.",
-        [{ label: "Then we keep climbing.", action: () => this.closeDialogue() }]
+        "The eastern pillar is carrying power again. Its lift is active beyond the restored core. Ride it to the staging threshold and confirm whether the route toward Floor Two can hold a living expedition.",
+        [{ label: "I’ll test the ascent.", action: () => this.closeDialogue() }]
       );
       return;
     }
@@ -291,7 +421,9 @@ export class Game {
     }
 
     const hunt = Math.min(3, quest.boarsDefeated);
-    const marker = quest.markerInvestigated ? "The marker’s signal is logged." : "The marker still needs a direct reading.";
+    const marker = quest.markerInvestigated
+      ? "The marker’s signal is logged."
+      : "The marker still needs a direct reading.";
     this.hud.showDialogue(
       "Mara Venn",
       "MV",
@@ -300,18 +432,78 @@ export class Game {
     );
   }
 
+  private finishAscentCycle(): void {
+    const x = this.labyrinth.corePosition.x;
+    const z = this.labyrinth.corePosition.z + 8;
+    const destination = new BABYLON.Vector3(x, this.world.heightAt(x, z), z);
+    this.player.root.position.copyFrom(destination);
+    this.player.lockTarget = null;
+    this.spawnImpact(destination.add(new BABYLON.Vector3(0, 1.25, 0)), true);
+    this.hud.notify(
+      "LIFT CYCLE COMPLETE",
+      "The staging scan is recorded. You have returned safely to the restored Foundry core."
+    );
+    this.canvas.focus();
+    this.input.requestPointerLock();
+  }
+
   private useFoundryShortcut(): void {
     const destination = new BABYLON.Vector3(0, this.world.heightAt(0, -18), -18);
     this.player.root.position.copyFrom(destination);
     this.player.lockTarget = null;
     this.audio.setAmbience("caelus");
+    this.ambienceRegion = "caelus";
     this.spawnImpact(destination.add(new BABYLON.Vector3(0, 1.2, 0)), true);
     this.hud.notify("FOUNDATION SHORTCUT", "The restored pillar returned you to the Caelus Reach gate.");
   }
 
+  private respawnOutdoorEnemies(): void {
+    let restored = 0;
+    for (let index = 0; index < Math.min(4, this.enemies.length); index += 1) {
+      if (this.enemies[index].alive) continue;
+      this.enemies[index].root.dispose(false, true);
+      this.enemies[index] = this.createEnemy(index);
+      restored += 1;
+    }
+    if (restored > 0) {
+      this.hud.notify(
+        "FRONTIER REPOPULATED",
+        `${restored} Rift Boar${restored === 1 ? "" : "s"} returned to the outer routes while you rested.`
+      );
+    }
+  }
+
+  private createEnemy(index: number): RiftBoar {
+    return new RiftBoar(
+      this.world,
+      this.world.spawnPoints[index].clone(),
+      index,
+      this.audio,
+      this.quests,
+      (amount, source) => this.player.receiveDamage(amount, source),
+      (position, heavy) => this.spawnImpact(position, heavy)
+    );
+  }
+
+  private updateAmbience(): void {
+    const position = this.player.position();
+    const next: AmbienceRegion = Math.abs(position.x) < 130 && position.z > 0 && position.z < 205
+      ? "caelus"
+      : "windscar";
+    if (next === this.ambienceRegion) return;
+    this.ambienceRegion = next;
+    this.audio.setAmbience(next);
+  }
+
   private closeDialogue(): void {
     this.hud.hideDialogue();
-    if (!this.paused) this.input.requestPointerLock();
+    if (
+      !this.paused
+      && !this.expedition.isLiftActive()
+      && this.ascentCinematicTime <= 0
+    ) {
+      this.input.requestPointerLock();
+    }
   }
 
   private setPaused(paused: boolean): void {
@@ -323,7 +515,9 @@ export class Game {
       this.audio.uiConfirm();
     } else {
       this.canvas.focus();
-      this.input.requestPointerLock();
+      if (!this.expedition.isLiftActive() && this.ascentCinematicTime <= 0) {
+        this.input.requestPointerLock();
+      }
       this.audio.uiConfirm();
     }
   }
@@ -373,9 +567,19 @@ export class Game {
       }, this.world.scene);
       shard.material = material;
       const angle = (index / shardCount) * Math.PI * 2;
-      shard.position = new BABYLON.Vector3(Math.cos(angle) * 0.36, Math.sin(index * 2.3) * 0.18, Math.sin(angle) * 0.36);
+      shard.position = new BABYLON.Vector3(
+        Math.cos(angle) * 0.36,
+        Math.sin(index * 2.3) * 0.18,
+        Math.sin(angle) * 0.36
+      );
       shard.rotation = new BABYLON.Vector3(angle, angle * 0.7, angle * 1.3);
-      shard.metadata = { direction: new BABYLON.Vector3(Math.cos(angle), 0.3 + (index % 3) * 0.12, Math.sin(angle)) };
+      shard.metadata = {
+        direction: new BABYLON.Vector3(
+          Math.cos(angle),
+          0.3 + (index % 3) * 0.12,
+          Math.sin(angle)
+        )
+      };
       shard.parent = root;
     }
 
@@ -397,7 +601,11 @@ export class Game {
       effect.root.scaling.setAll(scale);
       effect.root.rotation.y += delta * 5.5;
       effect.root.getChildMeshes().forEach((mesh: any) => {
-        if (mesh.metadata?.direction) mesh.position.addInPlace(mesh.metadata.direction.scale(delta * (effect.heavy ? 2.4 : 1.7)));
+        if (mesh.metadata?.direction) {
+          mesh.position.addInPlace(
+            mesh.metadata.direction.scale(delta * (effect.heavy ? 2.4 : 1.7))
+          );
+        }
         if (mesh.material) mesh.material.alpha = Math.max(0, 1 - progress);
       });
       if (progress >= 1) {

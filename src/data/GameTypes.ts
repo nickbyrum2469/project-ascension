@@ -44,11 +44,20 @@ export interface LabyrinthSave {
   shortcutOpened: boolean;
 }
 
+export interface ExpeditionSave {
+  activeBeacon: string;
+  activatedBeacons: string[];
+  claimedCaches: string[];
+  riftglassShards: number;
+  ascentCompleted: boolean;
+}
+
 export interface SaveData {
   version: number;
   settings: GameSettings;
   quest: QuestSave;
   labyrinth: LabyrinthSave;
+  expedition: ExpeditionSave;
   player: {
     health: number;
     focus: number;

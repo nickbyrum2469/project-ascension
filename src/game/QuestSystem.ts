@@ -1,4 +1,10 @@
-import type { GameSettings, LabyrinthSave, QuestSave, SaveData } from "../data/GameTypes.js";
+import type {
+  ExpeditionSave,
+  GameSettings,
+  LabyrinthSave,
+  QuestSave,
+  SaveData
+} from "../data/GameTypes.js";
 import type { Hud } from "../ui/Hud.js";
 import type { AudioDirector } from "../audio/AudioDirector.js";
 
@@ -21,6 +27,14 @@ const defaultLabyrinth = (): LabyrinthSave => ({
   shortcutOpened: false
 });
 
+const defaultExpedition = (): ExpeditionSave => ({
+  activeBeacon: "caelus-gate",
+  activatedBeacons: ["caelus-gate"],
+  claimedCaches: [],
+  riftglassShards: 0,
+  ascentCompleted: false
+});
+
 const defaultSettings = (): GameSettings => ({
   sensitivity: 0.8,
   fov: 75,
@@ -29,6 +43,8 @@ const defaultSettings = (): GameSettings => ({
   cameraMode: "third",
   compactQuestTracker: false
 });
+
+const uniqueStrings = (values: string[]): string[] => [...new Set(values.filter(Boolean))];
 
 export class QuestSystem {
   public readonly save: SaveData;
@@ -130,7 +146,48 @@ export class QuestSystem {
     this.save.labyrinth.shortcutOpened = true;
     this.save.player.focus = 100;
     this.persistAndRefresh();
-    this.hud.notify("PILLAR CORE RESTORED", "A permanent return route to Caelus Reach has opened.");
+    this.hud.notify("PILLAR CORE RESTORED", "A permanent return route and the eastern ascent lift are now powered.");
+    this.audio.quest();
+    return true;
+  }
+
+  public activateBeacon(id: string, displayName: string): boolean {
+    const activated = this.save.expedition.activatedBeacons.includes(id);
+    if (!activated) this.save.expedition.activatedBeacons.push(id);
+    const changed = this.save.expedition.activeBeacon !== id || !activated;
+    this.save.expedition.activeBeacon = id;
+    this.save.expedition.activatedBeacons = uniqueStrings(this.save.expedition.activatedBeacons);
+    this.persist();
+    this.hud.notify(
+      activated ? "BEACON RESTORED" : "FOUNDATION BEACON ATTUNED",
+      `${displayName} is now your active expedition rest point.`
+    );
+    this.audio.quest();
+    return changed;
+  }
+
+  public claimCache(id: string): boolean {
+    if (this.save.expedition.claimedCaches.includes(id)) return false;
+    this.save.expedition.claimedCaches.push(id);
+    this.save.expedition.claimedCaches = uniqueStrings(this.save.expedition.claimedCaches);
+    this.save.expedition.riftglassShards += 1;
+    this.persist();
+    this.hud.notify(
+      "RIFTGLASS CACHE RECOVERED",
+      `${this.save.expedition.riftglassShards} expedition shard${this.save.expedition.riftglassShards === 1 ? "" : "s"} secured.`
+    );
+    this.audio.quest();
+    return true;
+  }
+
+  public completeAscent(): boolean {
+    if (this.save.expedition.ascentCompleted) return false;
+    this.save.expedition.ascentCompleted = true;
+    this.persist();
+    this.hud.notify(
+      "ASCENT STAGING REACHED",
+      "The eastern pillar lift has carried you to the sealed threshold beneath Floor Two."
+    );
     this.audio.quest();
     return true;
   }
@@ -155,8 +212,17 @@ export class QuestSystem {
       const migratedGuardianDefeat = parsed.labyrinth?.guardianDefeated
         ?? parsed.labyrinth?.coreRestored
         ?? false;
+      const expedition = { ...defaultExpedition(), ...(parsed.expedition ?? {}) };
+      expedition.activatedBeacons = uniqueStrings([
+        "caelus-gate",
+        ...(parsed.expedition?.activatedBeacons ?? [])
+      ]);
+      expedition.claimedCaches = uniqueStrings(parsed.expedition?.claimedCaches ?? []);
+      if (!expedition.activatedBeacons.includes(expedition.activeBeacon)) {
+        expedition.activeBeacon = "caelus-gate";
+      }
       return {
-        version: 4,
+        version: 5,
         settings: { ...defaultSettings(), ...(parsed.settings ?? {}) },
         quest: { ...defaultQuest(), ...(parsed.quest ?? {}) },
         labyrinth: {
@@ -165,6 +231,7 @@ export class QuestSystem {
           sigilsActivated: [0, 1, 2].map((index) => parsedSigils[index] ?? false),
           guardianDefeated: migratedGuardianDefeat
         },
+        expedition,
         player: {
           health: parsed.player?.health ?? 100,
           focus: parsed.player?.focus ?? 0,
@@ -178,10 +245,11 @@ export class QuestSystem {
 
   private defaults(): SaveData {
     return {
-      version: 4,
+      version: 5,
       settings: defaultSettings(),
       quest: defaultQuest(),
       labyrinth: defaultLabyrinth(),
+      expedition: defaultExpedition(),
       player: {
         health: 100,
         focus: 0,
