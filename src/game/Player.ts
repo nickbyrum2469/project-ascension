@@ -54,13 +54,14 @@ export class Player {
     this.root.getChildMeshes().forEach((mesh: any) => world.shadowGenerator.addShadowCaster(mesh));
 
     this.settings = quests.save.settings;
+    this.cameraMode = this.settings.cameraMode;
     this.health = Math.max(20, quests.save.player.health);
     this.focus = quests.save.player.focus;
     if (!quests.save.player.riftglassUnlocked) {
       this.visual.rune.material.emissiveIntensity = 0.45;
     }
     this.createFirstPersonRig();
-    this.hud.setCameraMode(this.cameraMode);
+    this.setCameraMode(this.cameraMode, false);
     this.hud.setVitals(this.health, this.maxHealth, this.stamina, this.focus);
   }
 
@@ -100,6 +101,31 @@ export class Player {
   public applySettings(settings: GameSettings): void {
     this.settings = settings;
     this.world.camera.fov = BABYLON.Tools.ToRadians(settings.fov);
+    this.hud.setQuestCompact(settings.compactQuestTracker);
+    if (settings.cameraMode !== this.cameraMode) this.setCameraMode(settings.cameraMode, false);
+  }
+
+  public setCameraMode(mode: CameraMode, announce = true): void {
+    if (mode === this.cameraMode && this.fpRig) {
+      this.visual.root.setEnabled(mode === "third");
+      this.fpRig.setEnabled(mode === "first");
+      this.hud.setCameraMode(mode);
+      return;
+    }
+
+    this.cameraMode = mode;
+    this.cameraBlend = 0;
+    this.visual.root.setEnabled(mode === "third");
+    this.fpRig.setEnabled(mode === "first");
+    this.hud.setCameraMode(mode);
+
+    if (announce) {
+      this.hud.notify(
+        "PERSPECTIVE CHANGED",
+        mode === "first" ? "First-person view engaged." : "Third-person view engaged."
+      );
+      this.audio.uiConfirm();
+    }
   }
 
   public receiveDamage(amount: number, source: any): void {
@@ -127,19 +153,20 @@ export class Player {
 
   private applyLook(input: InputFrame): void {
     const factor = 0.0018 * this.settings.sensitivity;
+    const verticalDirection = this.settings.invertY ? -1 : 1;
     this.yaw += input.lookX * factor;
-    this.pitch = BABYLON.Scalar.Clamp(this.pitch + input.lookY * factor, -1.2, 0.78);
+    this.pitch = BABYLON.Scalar.Clamp(
+      this.pitch + input.lookY * factor * verticalDirection,
+      -1.2,
+      0.78
+    );
   }
 
   private handleModeActions(input: InputFrame, enemies: RiftBoar[]): void {
     if (input.toggleViewPressed) {
-      this.cameraMode = this.cameraMode === "third" ? "first" : "third";
-      this.cameraBlend = 0;
-      this.visual.root.setEnabled(this.cameraMode === "third");
-      this.fpRig.setEnabled(this.cameraMode === "first");
-      this.hud.setCameraMode(this.cameraMode);
-      this.hud.notify("VIEW SHIFT", this.cameraMode === "first" ? "First-person combat lattice engaged" : "Third-person field view engaged");
-      this.audio.uiConfirm();
+      this.setCameraMode(this.cameraMode === "third" ? "first" : "third");
+      this.settings.cameraMode = this.cameraMode;
+      this.quests.updateSettings(this.settings);
     }
     if (input.shoulderPressed) this.shoulder *= -1;
     if (input.lockOnPressed) {
@@ -203,8 +230,8 @@ export class Player {
 
     this.root.position.x += this.velocity.x * delta;
     this.root.position.z += this.velocity.z * delta;
-    this.root.position.x = BABYLON.Scalar.Clamp(this.root.position.x, -94, 94);
-    this.root.position.z = BABYLON.Scalar.Clamp(this.root.position.z, -96, 20);
+    this.root.position.x = BABYLON.Scalar.Clamp(this.root.position.x, -560, 560);
+    this.root.position.z = BABYLON.Scalar.Clamp(this.root.position.z, -620, 220);
 
     this.verticalVelocity -= 18.5 * delta;
     this.root.position.y += this.verticalVelocity * delta;
@@ -238,10 +265,11 @@ export class Player {
 
   private updateAttack(delta: number, enemies: RiftBoar[]): void {
     if (!this.attack) {
-      this.visual.rightArm.rotation.x = BABYLON.Scalar.Lerp(this.visual.rightArm.rotation.x, this.blocking ? -0.8 : 0, delta * 10);
-      this.visual.rightArm.rotation.z = BABYLON.Scalar.Lerp(this.visual.rightArm.rotation.z, this.blocking ? 0.5 : 0, delta * 10);
+      this.visual.rightArm.rotation.x = BABYLON.Scalar.Lerp(this.visual.rightArm.rotation.x, this.blocking ? -0.8 : -0.18, delta * 10);
+      this.visual.rightArm.rotation.z = BABYLON.Scalar.Lerp(this.visual.rightArm.rotation.z, this.blocking ? 0.5 : -0.08, delta * 10);
       this.visual.leftArm.rotation.x = BABYLON.Scalar.Lerp(this.visual.leftArm.rotation.x, this.blocking ? -0.7 : 0, delta * 10);
-      this.visual.sword.rotation.z = BABYLON.Scalar.Lerp(this.visual.sword.rotation.z, Math.PI, delta * 10);
+      this.visual.sword.rotation.x = BABYLON.Scalar.Lerp(this.visual.sword.rotation.x, Math.PI / 2 - 0.22, delta * 10);
+      this.visual.sword.rotation.z = BABYLON.Scalar.Lerp(this.visual.sword.rotation.z, -0.16, delta * 10);
       this.animateFirstPersonWeapon(delta, 0, null);
       return;
     }
@@ -255,7 +283,8 @@ export class Player {
     this.visual.rightArm.rotation.z = heavy ? -0.65 + progress * 1.25 : -0.25 + progress * 0.65;
     this.visual.leftArm.rotation.x = heavy ? -0.75 + progress * 1.1 : 0;
     this.visual.torso.rotation.y = (progress - 0.5) * (heavy ? 0.72 : 0.38);
-    this.visual.sword.rotation.z = Math.PI - swing * (heavy ? 0.58 : 0.32);
+    this.visual.sword.rotation.x = Math.PI / 2 - 0.34 + swing * (heavy ? 0.62 : 0.38);
+    this.visual.sword.rotation.z = -0.42 + progress * (heavy ? 1.7 : 1.15);
     this.animateFirstPersonWeapon(delta, progress, this.attack);
 
     const hitStart = heavy ? 0.42 : 0.27;
@@ -330,7 +359,7 @@ export class Player {
       const horizontal = Math.cos(this.pitch) * distance;
       const offset = new BABYLON.Vector3(
         -Math.sin(this.yaw) * horizontal + Math.cos(this.yaw) * this.shoulder * 0.72,
-        1.3 + Math.sin(-this.pitch) * distance,
+        1.3 + Math.sin(this.pitch) * distance,
         -Math.cos(this.yaw) * horizontal - Math.sin(this.yaw) * this.shoulder * 0.72
       );
       desired = target.add(offset);
@@ -370,7 +399,7 @@ export class Player {
       this.visual.leftLeg.rotation.x = Math.sin(this.walkCycle) * amplitude;
       this.visual.rightLeg.rotation.x = Math.sin(this.walkCycle + Math.PI) * amplitude;
       this.visual.leftArm.rotation.x = Math.sin(this.walkCycle + Math.PI) * amplitude * 0.7;
-      this.visual.rightArm.rotation.x = Math.sin(this.walkCycle) * amplitude * 0.45;
+      this.visual.rightArm.rotation.x = -0.18 + Math.sin(this.walkCycle) * amplitude * 0.28;
       this.visual.hips.position.y = 0.92 + Math.abs(Math.sin(this.walkCycle)) * 0.035;
       this.visual.cape.rotation.x = 0.08 + Math.sin(this.walkCycle * 0.5) * 0.05 + speed * 0.012;
       this.footTimer -= delta;
@@ -382,7 +411,7 @@ export class Player {
       this.visual.leftLeg.rotation.x = BABYLON.Scalar.Lerp(this.visual.leftLeg.rotation.x, 0, delta * 8);
       this.visual.rightLeg.rotation.x = BABYLON.Scalar.Lerp(this.visual.rightLeg.rotation.x, 0, delta * 8);
       this.visual.leftArm.rotation.x = BABYLON.Scalar.Lerp(this.visual.leftArm.rotation.x, 0, delta * 8);
-      this.visual.rightArm.rotation.x = BABYLON.Scalar.Lerp(this.visual.rightArm.rotation.x, 0, delta * 8);
+      this.visual.rightArm.rotation.x = BABYLON.Scalar.Lerp(this.visual.rightArm.rotation.x, -0.18, delta * 8);
       this.visual.hips.position.y = 0.92 + Math.sin(performance.now() * 0.0024) * 0.012;
       this.visual.cape.rotation.x = 0.08 + Math.sin(performance.now() * 0.0017) * 0.025;
     }
@@ -440,7 +469,7 @@ export class Player {
 
     this.fpSword = this.visual.sword.clone("first-person-riftglass-edge", this.fpRig, false);
     this.fpSword.position = new BABYLON.Vector3(0.02, -0.04, -0.36);
-    this.fpSword.rotation = new BABYLON.Vector3(-0.12, 0, Math.PI);
+    this.fpSword.rotation = new BABYLON.Vector3(-0.12, 0, -0.18);
     this.fpSword.scaling = new BABYLON.Vector3(1.12, 1.12, 1.12);
     this.fpSword.getChildMeshes?.().forEach((mesh: any) => {
       mesh.isPickable = false;

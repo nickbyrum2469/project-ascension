@@ -15,7 +15,10 @@ const defaultQuest = (): QuestSave => ({
 const defaultSettings = (): GameSettings => ({
   sensitivity: 0.8,
   fov: 75,
-  cameraShake: true
+  cameraShake: true,
+  invertY: false,
+  cameraMode: "third",
+  compactQuestTracker: false
 });
 
 export class QuestSystem {
@@ -92,7 +95,7 @@ export class QuestSystem {
       if (!raw) return this.defaults();
       const parsed = JSON.parse(raw) as Partial<SaveData>;
       return {
-        version: 1,
+        version: 2,
         settings: { ...defaultSettings(), ...(parsed.settings ?? {}) },
         quest: { ...defaultQuest(), ...(parsed.quest ?? {}) },
         player: {
@@ -108,7 +111,7 @@ export class QuestSystem {
 
   private defaults(): SaveData {
     return {
-      version: 1,
+      version: 2,
       settings: defaultSettings(),
       quest: defaultQuest(),
       player: {

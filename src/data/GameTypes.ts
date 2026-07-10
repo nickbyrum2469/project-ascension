@@ -22,6 +22,9 @@ export interface GameSettings {
   sensitivity: number;
   fov: number;
   cameraShake: boolean;
+  invertY: boolean;
+  cameraMode: CameraMode;
+  compactQuestTracker: boolean;
 }
 
 export interface QuestSave {
