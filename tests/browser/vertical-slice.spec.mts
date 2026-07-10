@@ -152,9 +152,9 @@ test("production vertical slice remains traversable and visually auditable", asy
 
   await bridgeCall(page, "unlockVerticalSlice");
   await bridgeCall(page, "checkpoint", "foundry-breach");
-  const insideBreach = await simulate(page, 4.5, ["KeyW"]);
-  expect(insideBreach.x).toBeGreaterThan(458);
-  expect(insideBreach.z).toBeLessThan(-462);
+  const insideBreach = await simulate(page, 8, ["KeyW"]);
+  expect(insideBreach.x).toBeGreaterThan(462);
+  expect(insideBreach.z).toBeLessThan(-461.5);
 
   for (const view of ["foundry-entry", "foundry-core", "pillar-lift"]) {
     await bridgeCall(page, "checkpoint", view);
