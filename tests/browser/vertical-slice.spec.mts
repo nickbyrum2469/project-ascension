@@ -12,6 +12,7 @@ interface Snapshot {
   cameraMode: "first" | "third";
   stamina: number;
   attack: string | null;
+  verticalSliceVersion: number | null;
   runtimeErrors: string[];
 }
 
@@ -21,6 +22,7 @@ interface GeometryAudit {
   disabledRequiredMeshes: string[];
   terrainBumpTexture: string | null;
   collisionBoxes: number;
+  verticalSliceVersion: number | null;
 }
 
 const bridgeCall = async <T>(page: Page, method: string, ...args: unknown[]): Promise<T> => page.evaluate(
@@ -57,11 +59,13 @@ test("production vertical slice remains traversable and visually auditable", asy
   await expect(page.locator("#enter-world")).toBeVisible();
   await page.locator("#enter-world").click();
   await expect(page.locator("#hud")).not.toHaveClass(/hidden/);
+  await expect(page.locator("#combat-stance-indicator")).toBeVisible();
   await settle(page, 650);
 
   const start = await bridgeCall<Snapshot>(page, "snapshot");
   expect(start.started).toBe(true);
   expect(start.cameraMode).toBe("third");
+  expect(start.verticalSliceVersion).toBe(2);
 
   await page.keyboard.down("KeyW");
   await page.waitForTimeout(1_850);
@@ -85,11 +89,18 @@ test("production vertical slice remains traversable and visually auditable", asy
   const heavy = await bridgeCall<Snapshot>(page, "snapshot");
   expect(heavy.stamina).toBeLessThan(staminaBeforeHeavy - 20);
   expect(heavy.attack).toBe("heavy");
+  await expect(page.locator("#combat-stance-indicator")).toHaveAttribute("data-state", "heavy");
+  await capture(page, testInfo, "combat-third-person-heavy");
   await settle(page, 1_000);
 
   await page.keyboard.press("KeyV");
   await settle(page, 260);
   expect((await bridgeCall<Snapshot>(page, "snapshot")).cameraMode).toBe("first");
+  await page.keyboard.press("KeyQ");
+  await page.waitForTimeout(160);
+  expect((await bridgeCall<Snapshot>(page, "snapshot")).attack).toBe("heavy");
+  await capture(page, testInfo, "combat-first-person-heavy");
+  await settle(page, 1_000);
   await page.keyboard.press("KeyV");
   await settle(page, 260);
   expect((await bridgeCall<Snapshot>(page, "snapshot")).cameraMode).toBe("third");
@@ -110,7 +121,8 @@ test("production vertical slice remains traversable and visually auditable", asy
   expect(audit.missingRequiredMeshes).toEqual([]);
   expect(audit.disabledRequiredMeshes).toEqual([]);
   expect(audit.terrainBumpTexture).toBeNull();
-  expect(audit.collisionBoxes).toBeGreaterThan(4);
+  expect(audit.collisionBoxes).toBeGreaterThan(20);
+  expect(audit.verticalSliceVersion).toBe(2);
 
   const views = [
     "spawn",
@@ -127,6 +139,15 @@ test("production vertical slice remains traversable and visually auditable", asy
   }
 
   await bridgeCall(page, "unlockVerticalSlice");
+  await bridgeCall(page, "checkpoint", "foundry-breach");
+  await page.keyboard.down("KeyW");
+  await page.waitForTimeout(3_500);
+  await page.keyboard.up("KeyW");
+  await settle(page, 250);
+  const insideBreach = await bridgeCall<Snapshot>(page, "snapshot");
+  expect(insideBreach.x).toBeGreaterThan(458);
+  expect(insideBreach.z).toBeLessThan(-462);
+
   for (const view of ["foundry-entry", "foundry-core", "pillar-lift"]) {
     await bridgeCall(page, "checkpoint", view);
     await settle(page, 420);
