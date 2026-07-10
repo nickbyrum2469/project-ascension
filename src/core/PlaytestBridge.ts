@@ -1,4 +1,5 @@
 type CameraMode = "first" | "third";
+type KeyEventType = "keydown" | "keyup";
 
 interface PlaytestCheckpoint {
   x: number;
@@ -44,13 +45,16 @@ export class PlaytestBridge {
     });
 
     const api = {
-      version: 2,
+      version: 3,
       renderer,
       checkpoints: Object.keys(checkpoints),
       snapshot: () => this.snapshot(),
       checkpoint: (name: string) => this.moveToCheckpoint(name),
       teleport: (x: number, z: number, yaw = Math.PI) => this.teleport(x, z, yaw),
       setView: (mode: CameraMode) => this.setView(mode),
+      keyDown: (code: string) => this.dispatchKey("keydown", code),
+      keyUp: (code: string) => this.dispatchKey("keyup", code),
+      clearInput: () => this.clearInput(),
       clearErrors: () => { this.errors.length = 0; },
       errors: () => [...this.errors],
       geometryAudit: () => this.geometryAudit(),
@@ -65,9 +69,17 @@ export class PlaytestBridge {
     const player = this.game.player;
     const position = player.root.position;
     const ground = this.game.world.heightAt(position.x, position.z);
+    const input = this.game.input as any;
+    const interfaceOpen = document.querySelector(".journal-shell.open, .loadout-overlay.open") !== null;
     return {
       started: Boolean(this.game.started),
       paused: Boolean(this.game.paused),
+      interfaceOpen,
+      dialogueOpen: Boolean(this.game.hud?.isDialogueOpen?.()),
+      liftActive: Boolean(this.game.expedition?.isLiftActive?.()),
+      ascentCinematicTime: Number(this.game.ascentCinematicTime ?? 0),
+      inputEnabled: Boolean(input?.enabled),
+      activeKeys: Array.from(input?.keys ?? []),
       x: Number(position.x.toFixed(3)),
       y: Number(position.y.toFixed(3)),
       z: Number(position.z.toFixed(3)),
@@ -85,6 +97,8 @@ export class PlaytestBridge {
       meshCount: this.game.world.scene.meshes.length,
       activeMeshes: this.game.world.scene.getActiveMeshes?.().length ?? 0,
       verticalSliceVersion: this.game.world.scene.metadata?.verticalSliceVersion ?? null,
+      protectedRouteCollisionVolumesRemoved:
+        this.game.world.scene.metadata?.protectedRouteCollisionVolumesRemoved ?? 0,
       runtimeErrors: [...this.errors]
     };
   }
@@ -92,6 +106,7 @@ export class PlaytestBridge {
   private moveToCheckpoint(name: string): Record<string, unknown> {
     const checkpoint = checkpoints[name];
     if (!checkpoint) throw new Error(`Unknown playtest checkpoint: ${name}`);
+    this.clearInput();
     this.teleport(checkpoint.x, checkpoint.z, checkpoint.yaw);
     return this.snapshot();
   }
@@ -115,6 +130,25 @@ export class PlaytestBridge {
 
   private setView(mode: CameraMode): void {
     this.game.player.setCameraMode(mode, false);
+  }
+
+  private dispatchKey(type: KeyEventType, code: string): void {
+    const event = new KeyboardEvent(type, {
+      code,
+      key: code,
+      bubbles: true,
+      cancelable: true,
+      repeat: false
+    });
+    window.dispatchEvent(event);
+  }
+
+  private clearInput(): void {
+    const input = this.game.input as any;
+    input?.keys?.clear?.();
+    input?.pressed?.clear?.();
+    input.mouseHeavy = false;
+    input.mouseBlock = false;
   }
 
   private geometryAudit(): Record<string, unknown> {
@@ -150,7 +184,10 @@ export class PlaytestBridge {
       terrainMaterial: scene.getMaterialByName?.("windscar-ground")?.name ?? null,
       terrainBumpTexture: scene.getMaterialByName?.("windscar-ground")?.bumpTexture?.name ?? null,
       collisionBoxes: this.game.world.collisionBoxes?.length ?? 0,
-      verticalSliceVersion: scene.metadata?.verticalSliceVersion ?? null
+      verticalSliceVersion: scene.metadata?.verticalSliceVersion ?? null,
+      dynamicActorsRebased: Boolean(scene.metadata?.dynamicActorsRebased),
+      protectedRouteCollisionVolumesRemoved:
+        Number(scene.metadata?.protectedRouteCollisionVolumesRemoved ?? 0)
     };
   }
 
