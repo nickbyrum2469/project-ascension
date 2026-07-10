@@ -12,10 +12,10 @@ const checkpoints: Record<string, PlaytestCheckpoint> = {
   "city-boulevard": { x: 0, z: 74, yaw: 0 },
   "city-plaza": { x: 0, z: 112, yaw: 0 },
   frontier: { x: -22, z: -156, yaw: Math.PI * 0.9 },
-  "foundry-breach": { x: 452, z: -454, yaw: Math.PI * 0.88 },
+  "foundry-breach": { x: 448, z: -451, yaw: Math.PI * 0.84 },
   "foundry-entry": { x: 475, z: -470, yaw: Math.PI },
   "foundry-core": { x: 475, z: -592, yaw: Math.PI },
-  "pillar-lift": { x: 510, z: -582, yaw: Math.PI * 0.55 }
+  "pillar-lift": { x: 475, z: -606, yaw: Math.PI }
 };
 
 const serializeReason = (reason: unknown): string => {
@@ -44,7 +44,7 @@ export class PlaytestBridge {
     });
 
     const api = {
-      version: 1,
+      version: 2,
       renderer,
       checkpoints: Object.keys(checkpoints),
       snapshot: () => this.snapshot(),
@@ -84,6 +84,7 @@ export class PlaytestBridge {
       expedition: { ...(this.game.quests?.save?.expedition ?? {}) },
       meshCount: this.game.world.scene.meshes.length,
       activeMeshes: this.game.world.scene.getActiveMeshes?.().length ?? 0,
+      verticalSliceVersion: this.game.world.scene.metadata?.verticalSliceVersion ?? null,
       runtimeErrors: [...this.errors]
     };
   }
@@ -126,16 +127,20 @@ export class PlaytestBridge {
     }).map((mesh: any) => mesh.name);
 
     const requiredMeshes = [
-      "frontier-path-stone-a-batch",
-      "frontier-path-stone-b-batch",
-      "frontier-route-bush-a-batch",
-      "frontier-route-rock-batch",
-      "caelus-cobble-a-batch",
-      "caelus-city-doors-batch",
-      "caelus-city-windows-batch",
-      "caelus-market-canopies-batch",
+      "vertical-slice-caelus-boulevard",
+      "vertical-slice-city-bodies-a",
+      "vertical-slice-city-doors",
+      "vertical-slice-city-windows",
+      "vertical-slice-market-canopies",
+      "vertical-slice-road-surface",
+      "vertical-slice-route-bushes-a",
+      "vertical-slice-route-rocks",
+      "vertical-slice-foundry-cliff-wall",
+      "vertical-slice-foundry-tunnel-floor",
       "foundry-spine-floor",
-      "foundry-core-arena"
+      "foundry-core-arena",
+      "vertical-slice-core-to-pillar-catwalk",
+      "vertical-slice-pillar-shell"
     ];
 
     return {
@@ -144,7 +149,8 @@ export class PlaytestBridge {
       disabledRequiredMeshes: requiredMeshes.filter((name) => scene.getMeshByName?.(name) && !enabled(name)),
       terrainMaterial: scene.getMaterialByName?.("windscar-ground")?.name ?? null,
       terrainBumpTexture: scene.getMaterialByName?.("windscar-ground")?.bumpTexture?.name ?? null,
-      collisionBoxes: this.game.world.collisionBoxes?.length ?? 0
+      collisionBoxes: this.game.world.collisionBoxes?.length ?? 0,
+      verticalSliceVersion: scene.metadata?.verticalSliceVersion ?? null
     };
   }
 
