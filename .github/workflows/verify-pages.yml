@@ -1,24 +1,22 @@
 name: Verify Live Browser Release
 
 on:
-  push:
+  pull_request:
     branches: [main]
-    paths-ignore:
-      - "docs/DEPLOYMENT_STATUS.md"
+    paths:
+      - "docs/release-probe-trigger.md"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
       - name: Probe live game
         id: probe
         shell: bash
@@ -26,47 +24,30 @@ jobs:
           URL="https://nickbyrum2469.github.io/project-ascension/"
           STATUS="not-live"
           CODE="000"
-          for attempt in {1..12}; do
+          for attempt in {1..8}; do
             CODE=$(curl --location --silent --output /tmp/ascension.html --write-out "%{http_code}" --max-time 20 "$URL" || true)
             if [ "$CODE" = "200" ] && grep -q "PROJECT ASCENSION" /tmp/ascension.html; then
               STATUS="live"
               break
             fi
-            sleep 20
+            sleep 15
           done
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
-      - name: Record deployment result
-        shell: bash
-        run: |
-          mkdir -p docs
-          if [ "${{ steps.probe.outputs.status }}" = "live" ]; then
-            cat > docs/DEPLOYMENT_STATUS.md <<'EOF'
-          # Deployment Status
-
-          Status: **LIVE**
-
-          Playable URL: https://nickbyrum2469.github.io/project-ascension/
-
-          The production browser build responded successfully and contained the Project Ascension game shell.
-          EOF
-          else
-            cat > docs/DEPLOYMENT_STATUS.md <<EOF
-          # Deployment Status
-
-          Status: **PAGES SETUP REQUIRED**
-
-          Expected URL: https://nickbyrum2469.github.io/project-ascension/
-
-          Last HTTP response: ${{ steps.probe.outputs.code }}
-
-          The game build and quality gate passed. GitHub Pages must be enabled for this repository with **Settings → Pages → Source: GitHub Actions**.
-          EOF
-          fi
-          git config user.name "Project Ascension Release"
-          git config user.email "actions@users.noreply.github.com"
-          git add docs/DEPLOYMENT_STATUS.md
-          if ! git diff --cached --quiet; then
-            git commit -m "docs: record browser deployment status"
-            git push origin HEAD:main
-          fi
+      - name: Report deployment result
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ steps.probe.outputs.status }}';
+            const code = '${{ steps.probe.outputs.code }}';
+            const url = 'https://nickbyrum2469.github.io/project-ascension/';
+            const body = status === 'live'
+              ? `✅ **Project Ascension is live.**\n\nPlayable URL: ${url}\n\nThe production page returned HTTP 200 and contained the Project Ascension game shell.`
+              : `⚠️ **The game build is green, but GitHub Pages is not live yet.**\n\nExpected URL: ${url}\nLast HTTP response: ${code}\n\nEnable **Settings → Pages → Source: GitHub Actions**, then rerun the deployment workflow.`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
