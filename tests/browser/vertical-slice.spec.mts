@@ -141,7 +141,7 @@ test("production vertical slice remains traversable and visually auditable", asy
   await bridgeCall(page, "unlockVerticalSlice");
   await bridgeCall(page, "checkpoint", "foundry-breach");
   await page.keyboard.down("KeyW");
-  await page.waitForTimeout(3_500);
+  await page.waitForTimeout(4_500);
   await page.keyboard.up("KeyW");
   await settle(page, 250);
   const insideBreach = await bridgeCall<Snapshot>(page, "snapshot");
