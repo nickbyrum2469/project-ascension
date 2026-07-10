@@ -30,6 +30,7 @@ const sourceFiles = await Promise.all([
   "src/game/Game.ts",
   "src/game/Player.ts",
   "src/game/QuestSystem.ts",
+  "src/game/RiftBoar.ts",
   "src/world/World.ts",
   "src/world/FoundryLabyrinth.ts",
   "src/ui/Hud.ts"
@@ -42,6 +43,9 @@ for (const banned of ["todo:", "replace later", "temporary asset", "placeholder 
 for (const requiredFeature of [
   "foundrylabyrinth",
   "sigilsactivated",
+  "guardianDefeated".toLowerCase(),
+  "foundry sentinel",
+  "slam",
   "restorecore",
   "shortcutopened"
 ]) {
