@@ -31,9 +31,11 @@ export class Hud {
   private readonly interactionPrompt = required<HTMLElement>("interaction-prompt");
   private readonly interactionLabel = required<HTMLElement>("interaction-label");
   private readonly questCard = required<HTMLElement>("quest-card");
+  private readonly questCollapse = required<HTMLButtonElement>("quest-collapse");
   private readonly questTitle = required<HTMLElement>("quest-title");
   private readonly questDescription = required<HTMLElement>("quest-description");
   private readonly questObjectives = required<HTMLUListElement>("quest-objectives");
+  private readonly viewSwitchHint = required<HTMLElement>("view-switch-hint");
   private readonly dialoguePanel = required<HTMLElement>("dialogue-panel");
   private readonly speakerName = required<HTMLElement>("speaker-name");
   private readonly speakerInitials = required<HTMLElement>("speaker-initials");
@@ -46,7 +48,14 @@ export class Hud {
   private readonly sensitivitySetting = required<HTMLInputElement>("sensitivity-setting");
   private readonly fovSetting = required<HTMLInputElement>("fov-setting");
   private readonly shakeSetting = required<HTMLInputElement>("shake-setting");
+  private readonly invertYSetting = required<HTMLInputElement>("invert-y-setting");
+  private readonly questTrackerSetting = required<HTMLInputElement>("quest-tracker-setting");
+  private readonly cameraFirst = required<HTMLButtonElement>("camera-mode-first");
+  private readonly cameraThird = required<HTMLButtonElement>("camera-mode-third");
   private dialogueOpen = false;
+  private currentMode: CameraMode = "third";
+  private currentSettings: GameSettings | null = null;
+  private settingsChanged: ((settings: GameSettings) => void) | null = null;
 
   public readonly enterButton = required<HTMLButtonElement>("enter-world");
   public readonly resumeButton = required<HTMLButtonElement>("resume-game");
@@ -64,10 +73,11 @@ export class Hud {
   public enterWorld(): void {
     this.bootScreen.classList.add("hidden");
     this.hud.classList.remove("hidden");
+    window.setTimeout(() => this.viewSwitchHint.classList.add("dismissed"), 11000);
   }
 
   public setRenderer(name: string): void {
-    this.performanceChip.innerHTML = `<span>◆</span> ${name.toUpperCase()}`;
+    this.performanceChip.innerHTML = `<span>${name.toUpperCase()}</span>`;
   }
 
   public setVitals(health: number, maxHealth: number, stamina: number, focus: number): void {
@@ -81,9 +91,22 @@ export class Hud {
   }
 
   public setCameraMode(mode: CameraMode): void {
+    this.currentMode = mode;
     const label = mode === "first" ? "FIRST PERSON" : "THIRD PERSON";
-    this.cameraMode.innerHTML = `<span>${mode === "first" ? "◎" : "◉"}</span> ${label}`;
+    this.cameraMode.innerHTML = `<kbd>V</kbd><span>${label}</span>`;
     this.crosshair.classList.toggle("hidden", mode !== "first");
+    this.cameraFirst.classList.toggle("selected", mode === "first");
+    this.cameraThird.classList.toggle("selected", mode === "third");
+    this.cameraFirst.setAttribute("aria-pressed", String(mode === "first"));
+    this.cameraThird.setAttribute("aria-pressed", String(mode === "third"));
+    this.viewSwitchHint.classList.add("dismissed");
+  }
+
+  public setQuestCompact(compact: boolean): void {
+    this.questCard.classList.toggle("compact", compact);
+    this.questTrackerSetting.checked = compact;
+    this.questCollapse.textContent = compact ? "+" : "—";
+    this.questCollapse.setAttribute("aria-label", compact ? "Expand quest tracker" : "Collapse quest tracker");
   }
 
   public setCompass(yaw: number): void {
@@ -120,14 +143,14 @@ export class Hud {
       this.appendObjective("Find Mara Venn", false);
     } else if (!quest.completed) {
       this.questTitle.textContent = "Echoes Under Stone";
-      this.questDescription.textContent = "Track the creatures drawn to the buried mechanism beneath Windscar Verge.";
+      this.questDescription.textContent = "Trace the creatures drawn toward the buried mechanism beneath Windscar Verge.";
       this.appendObjective(`Cull rift boars (${Math.min(3, quest.boarsDefeated)}/3)`, quest.boarsDefeated >= 3);
       this.appendObjective("Investigate the resonant marker", quest.markerInvestigated);
       if (quest.boarsDefeated >= 3 && quest.markerInvestigated) {
         this.appendObjective("Return to Mara Venn", false);
       }
     } else {
-      this.questTitle.textContent = "Echoes Under Stone — Complete";
+      this.questTitle.textContent = "Echoes Under Stone";
       this.questDescription.textContent = "The first route toward the buried Foundry has been recorded.";
       this.appendObjective("Riftglass Edge attuned", true);
     }
@@ -171,19 +194,50 @@ export class Hud {
   }
 
   public bindSettings(settings: GameSettings, onChange: (settings: GameSettings) => void): void {
+    this.currentSettings = { ...settings };
+    this.settingsChanged = onChange;
     this.sensitivitySetting.value = settings.sensitivity.toString();
     this.fovSetting.value = settings.fov.toString();
     this.shakeSetting.checked = settings.cameraShake;
+    this.invertYSetting.checked = settings.invertY;
+    this.questTrackerSetting.checked = settings.compactQuestTracker;
+    this.setCameraMode(settings.cameraMode);
+    this.setQuestCompact(settings.compactQuestTracker);
+
     const emit = (): void => {
-      onChange({
+      if (!this.currentSettings || !this.settingsChanged) return;
+      this.currentSettings = {
         sensitivity: Number(this.sensitivitySetting.value),
         fov: Number(this.fovSetting.value),
-        cameraShake: this.shakeSetting.checked
-      });
+        cameraShake: this.shakeSetting.checked,
+        invertY: this.invertYSetting.checked,
+        cameraMode: this.currentMode,
+        compactQuestTracker: this.questTrackerSetting.checked
+      };
+      this.settingsChanged({ ...this.currentSettings });
     };
+
     this.sensitivitySetting.addEventListener("input", emit);
     this.fovSetting.addEventListener("input", emit);
     this.shakeSetting.addEventListener("change", emit);
+    this.invertYSetting.addEventListener("change", emit);
+    this.questTrackerSetting.addEventListener("change", () => {
+      this.setQuestCompact(this.questTrackerSetting.checked);
+      emit();
+    });
+    this.cameraFirst.addEventListener("click", () => {
+      this.setCameraMode("first");
+      emit();
+    });
+    this.cameraThird.addEventListener("click", () => {
+      this.setCameraMode("third");
+      emit();
+    });
+    this.questCollapse.addEventListener("click", () => {
+      const compact = !this.questCard.classList.contains("compact");
+      this.setQuestCompact(compact);
+      emit();
+    });
   }
 
   public notify(title: string, message: string): void {
