@@ -152,6 +152,7 @@ export class FoundryLabyrinth {
       unlocked: true,
       entered: !this.sealedGate.isEnabled(),
       sigilsActivated: [false, false, false],
+      guardianDefeated: !this.shortcutGate.isEnabled(),
       coreRestored: !this.shortcutGate.isEnabled(),
       shortcutOpened: !this.shortcutGate.isEnabled()
     };
