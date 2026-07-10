@@ -1,5 +1,6 @@
 import "./styles.css";
 import * as BabylonModule from "babylonjs";
+import { PerformanceDirector } from "./core/PerformanceDirector.js";
 import { ExpeditionJournal } from "./ui/ExpeditionJournal.js";
 import { LoadoutOverlay } from "./ui/LoadoutOverlay.js";
 
@@ -19,7 +20,7 @@ const createEngine = async (canvas: HTMLCanvasElement): Promise<{ engine: any; r
   if (webGpuAvailable) {
     try {
       const engine = new BABYLON.WebGPUEngine(canvas, {
-        antialias: true,
+        antialias: false,
         adaptToDeviceRatio: true,
         powerPreference: "high-performance"
       });
@@ -30,7 +31,7 @@ const createEngine = async (canvas: HTMLCanvasElement): Promise<{ engine: any; r
     }
   }
 
-  const engine = new BABYLON.Engine(canvas, true, {
+  const engine = new BABYLON.Engine(canvas, false, {
     preserveDrawingBuffer: false,
     stencil: true,
     disableWebGL2Support: false,
@@ -70,6 +71,18 @@ const installInterfacePauseGuard = (GameClass: any): void => {
   prototype.__interfacePauseGuard = true;
 };
 
+const applyEmergencyGpuBudget = (game: any): void => {
+  const shadowMap = game.world.shadowGenerator?.getShadowMap?.();
+  const shadowSize = shadowMap?.getSize?.();
+  if (shadowMap?.resize && Number(shadowSize?.width ?? 0) > 1024) shadowMap.resize(1024);
+
+  const dust = game.world.scene.particleSystems?.find((system: any) => system.name === "foundation-dust");
+  if (dust) {
+    dust.emitRate = Math.min(18, dust.emitRate);
+    dust.updateSpeed = Math.min(0.012, dust.updateSpeed ?? 0.012);
+  }
+};
+
 const boot = async (): Promise<void> => {
   const canvas = getCanvas();
   const status = document.getElementById("boot-status");
@@ -83,6 +96,8 @@ const boot = async (): Promise<void> => {
     new ExpeditionJournal();
     new LoadoutOverlay();
     game.world.mara.root.position.y += 0.31;
+    applyEmergencyGpuBudget(game);
+    new PerformanceDirector(engine, game.world, renderer);
     game.run();
   } catch (error) {
     console.error(error);
