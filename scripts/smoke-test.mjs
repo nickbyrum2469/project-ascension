@@ -140,6 +140,8 @@ for (const requiredFeature of [
   "__ascension_playtest__",
   "geometryaudit",
   "unlockverticalslice",
+  "simulate: (seconds",
+  "this.game.update(1 / 60)",
   "verticalsliceversion: 2",
   "sculptedheightat",
   "vertical-slice-caelus-boulevard",
@@ -231,10 +233,11 @@ for (const requiredWorkflowRule of [
 
 const browserTest = await readFile("tests/browser/vertical-slice.spec.mts", "utf8");
 for (const requiredBrowserRule of [
-  'keyDown(page, "KeyW")',
-  'tapKey(page, "Space")',
-  'tapKey(page, "KeyQ")',
-  'tapKey(page, "KeyV")',
+  'bridgeCall(page, "keyDown", "KeyW")',
+  'simulate(page, 1.85, ["KeyW"])',
+  'simulate(page, 0.08, ["Space"])',
+  'simulate(page, 0.08, ["KeyQ"])',
+  'simulate(page, 0.05, ["KeyV"])',
   'expect(heldInput.activeKeys).toContain("KeyW")',
   'bridgeCall<GeometryAudit>(page, "geometryAudit")',
   '"foundry-core"',
