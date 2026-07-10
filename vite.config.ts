@@ -4,12 +4,16 @@ export default defineConfig({
   base: "./",
   build: {
     target: "es2022",
-    sourcemap: true,
+    sourcemap: false,
     cssCodeSplit: true,
     assetsInlineLimit: 4096,
+    chunkSizeWarningLimit: 9000,
     rollupOptions: {
       output: {
-        manualChunks: undefined
+        manualChunks(id) {
+          if (id.includes("node_modules/babylonjs")) return "babylon";
+          return undefined;
+        }
       }
     }
   },
