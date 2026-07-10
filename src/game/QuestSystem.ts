@@ -1,6 +1,7 @@
 import type {
   EnemyKind,
   EquipmentSave,
+  EquippedCharm,
   ExpeditionSave,
   GameSettings,
   LabyrinthSave,
@@ -11,6 +12,7 @@ import type { Hud } from "../ui/Hud.js";
 import type { AudioDirector } from "../audio/AudioDirector.js";
 
 const STORAGE_KEY = "project-ascension-save-v1";
+const EQUIP_CHARM_EVENT = "project-ascension-equip-charm";
 
 const defaultQuest = (): QuestSave => ({
   accepted: false,
@@ -65,6 +67,10 @@ export class QuestSystem {
   ) {
     this.save = this.load();
     this.recalculateEquipment(false);
+    window.addEventListener(EQUIP_CHARM_EVENT, (event: Event) => {
+      const charm = (event as CustomEvent<{ charm?: EquippedCharm }>).detail?.charm;
+      if (charm) this.setEquippedCharm(charm);
+    });
     this.refreshHud();
   }
 
@@ -152,6 +158,7 @@ export class QuestSystem {
     this.recalculateEquipment(true);
     this.persistAndRefresh();
     this.hud.notify("SENTINEL DISMANTLED", "The Foundry core is undefended. Four dense fracture-dust charges were recovered.");
+    this.hud.notify("SENTINEL REMNANT UNLOCKED", "Open the Loadout panel with L to attune the guardian charm.");
     this.audio.quest();
   }
 
@@ -178,6 +185,7 @@ export class QuestSystem {
   }
 
   public activateBeacon(id: string, displayName: string): boolean {
+    const hadWayfinder = this.save.expedition.activatedBeacons.length >= 3;
     const activated = this.save.expedition.activatedBeacons.includes(id);
     if (!activated) this.save.expedition.activatedBeacons.push(id);
     const changed = this.save.expedition.activeBeacon !== id || !activated;
@@ -189,6 +197,10 @@ export class QuestSystem {
       activated ? "BEACON RESTORED" : "FOUNDATION BEACON ATTUNED",
       `${displayName} is now your active expedition rest point.`
     );
+    if (!hadWayfinder && this.save.expedition.activatedBeacons.length >= 3) {
+      this.hud.notify("WAYFINDER THREAD UNLOCKED", "Open the Loadout panel with L to attune the exploration charm.");
+      this.audio.quest();
+    }
     this.audio.quest();
     return changed;
   }
@@ -216,6 +228,26 @@ export class QuestSystem {
       "ASCENT STAGING REACHED",
       "The eastern pillar lift has carried you to the sealed threshold beneath Floor Two."
     );
+    this.audio.quest();
+    return true;
+  }
+
+  public canEquipCharm(charm: EquippedCharm): boolean {
+    if (charm === "none") return true;
+    if (charm === "wayfinder") return this.save.expedition.activatedBeacons.length >= 3;
+    return this.save.labyrinth.guardianDefeated;
+  }
+
+  public setEquippedCharm(charm: EquippedCharm): boolean {
+    if (!this.canEquipCharm(charm) || this.save.equipment.equippedCharm === charm) return false;
+    this.save.equipment.equippedCharm = charm;
+    this.persist();
+    const label = charm === "sentinel"
+      ? "Sentinel Remnant"
+      : charm === "wayfinder"
+        ? "Wayfinder Thread"
+        : "No charm";
+    this.hud.notify("CHARM ATTUNED", `${label} is now resonating with the Warden frame.`);
     this.audio.quest();
     return true;
   }
@@ -251,11 +283,9 @@ export class QuestSystem {
     const dust = this.save.expedition.fractureDust;
     this.save.equipment.weaponRank = shards >= 4 && dust >= 10 ? 3 : shards >= 2 || dust >= 5 ? 2 : 1;
     this.save.equipment.wardRank = dust >= 16 ? 2 : dust >= 8 ? 1 : 0;
-    this.save.equipment.equippedCharm = this.save.labyrinth.guardianDefeated
-      ? "sentinel"
-      : this.save.expedition.activatedBeacons.length >= 3
-        ? "wayfinder"
-        : "none";
+    if (!this.canEquipCharm(this.save.equipment.equippedCharm)) {
+      this.save.equipment.equippedCharm = "none";
+    }
 
     if (!announce) return;
     if (this.save.equipment.weaponRank > previous.weaponRank) {
@@ -270,15 +300,6 @@ export class QuestSystem {
         "FOUNDATION WARD REINFORCED",
         `Ward rank ${this.save.equipment.wardRank} reached. Incoming damage reduced.`
       );
-      this.audio.quest();
-    }
-    if (this.save.equipment.equippedCharm !== previous.equippedCharm) {
-      const label = this.save.equipment.equippedCharm === "sentinel"
-        ? "Sentinel Remnant"
-        : this.save.equipment.equippedCharm === "wayfinder"
-          ? "Wayfinder Thread"
-          : "No charm";
-      this.hud.notify("CHARM ATTUNED", `${label} is now resonating with the Warden frame.`);
       this.audio.quest();
     }
   }
