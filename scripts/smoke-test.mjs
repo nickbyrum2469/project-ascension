@@ -11,7 +11,9 @@ const requiredFiles = [
   "src/world/World.ts",
   "src/world/FoundryLabyrinth.ts",
   "src/world/ProceduralAssets.ts",
+  "src/world/RiftWispAsset.ts",
   "src/ui/Hud.ts",
+  "src/ui/ExpeditionJournal.ts",
   "src/audio/AudioDirector.ts",
   "public/assets/asset-manifest.json",
   "public/assets/branding/ascension-mark.svg"
@@ -34,7 +36,9 @@ const sourceFiles = await Promise.all([
   "src/world/World.ts",
   "src/world/FoundryLabyrinth.ts",
   "src/world/ProceduralAssets.ts",
-  "src/ui/Hud.ts"
+  "src/world/RiftWispAsset.ts",
+  "src/ui/Hud.ts",
+  "src/ui/ExpeditionJournal.ts"
 ].map((file) => readFile(file, "utf8")));
 const productionSource = sourceFiles.join("\n").toLowerCase();
 for (const banned of ["todo:", "replace later", "temporary asset", "placeholder asset", "navigationrect"]) {
@@ -64,10 +68,26 @@ for (const requiredFeature of [
   "boar-danger-ring",
   "boar-danger-sweep",
   "updatecombattelegraph",
-  "emissiveintensity"
+  "emissiveintensity",
+  "rift wisp constellation",
+  "createriftwisp",
+  "spawnwispbolt",
+  "wisp core recovered",
+  "fracturedust",
+  "weaponrank",
+  "wardrank",
+  "equippedcharm",
+  "outgoingdamagemultiplier",
+  "incomingdamagemultiplier",
+  "sentinel remnant",
+  "wayfinder thread",
+  "data-tab=\"loadout\"",
+  "western-watch",
+  "aqueduct-overlook",
+  "foundry-threshold"
 ]) {
   if (!productionSource.includes(requiredFeature)) {
-    throw new Error(`Missing required reconstruction feature: ${requiredFeature}`);
+    throw new Error(`Missing required production feature: ${requiredFeature}`);
   }
 }
 
@@ -81,4 +101,4 @@ for (const asset of manifest.assets) {
   }
 }
 
-console.log("Project Ascension reconstruction smoke checks passed.");
+console.log("Project Ascension production smoke checks passed.");
