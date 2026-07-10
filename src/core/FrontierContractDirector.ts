@@ -72,7 +72,7 @@ export class FrontierContractDirector {
     this.player = game.player;
     this.hud = game.hud;
     this.audio = game.audio;
-    this.boardPosition = new BABYLON.Vector3(-48, this.world.heightAt(-48, 52), 52);
+    this.boardPosition = new BABYLON.Vector3(-24, this.world.heightAt(-24, 52), 52);
     this.state = this.loadState();
 
     this.createBoard();
@@ -95,9 +95,10 @@ export class FrontierContractDirector {
     const normalize = (id: ContractId): ContractRecord => {
       const fallback = defaultRecord();
       const value = saved[id] ?? fallback;
+      const target = this.definition(id).target;
       return {
         active: Boolean(value.active ?? fallback.active),
-        progress: Math.max(0, Number(value.progress ?? fallback.progress)),
+        progress: Math.min(target, Math.max(0, Number(value.progress ?? fallback.progress))),
         completions: Math.max(0, Number(value.completions ?? fallback.completions))
       };
     };
@@ -122,6 +123,10 @@ export class FrontierContractDirector {
     const root = new BABYLON.TransformNode("caelus-frontier-contract-board", scene);
     root.position.copyFrom(this.boardPosition);
     root.rotation.y = 0.08;
+    const timberMeshes: any[] = [];
+    const metalMeshes: any[] = [];
+    const parchmentMeshes: any[] = [];
+    const glowMeshes: any[] = [];
 
     [-1, 1].forEach((side) => {
       const post = BABYLON.MeshBuilder.CreateCylinder(`contract-board-post-${side}`, {
@@ -133,6 +138,8 @@ export class FrontierContractDirector {
       post.position = new BABYLON.Vector3(side * 2.35, 2.3, 0);
       post.material = timber;
       post.parent = root;
+      timberMeshes.push(post);
+
       const foot = BABYLON.MeshBuilder.CreateBox(`contract-board-foot-${side}`, {
         width: 0.95,
         height: 0.35,
@@ -141,6 +148,7 @@ export class FrontierContractDirector {
       foot.position = new BABYLON.Vector3(side * 2.35, 0.16, 0);
       foot.material = metal;
       foot.parent = root;
+      metalMeshes.push(foot);
     });
 
     const board = BABYLON.MeshBuilder.CreateBox("contract-board-face", {
@@ -151,9 +159,8 @@ export class FrontierContractDirector {
     board.position.y = 3.1;
     board.material = timber;
     board.parent = root;
-    board.metadata = { cameraCollision: true };
-    board.isPickable = true;
     board.receiveShadows = true;
+    timberMeshes.push(board);
 
     const header = BABYLON.MeshBuilder.CreateBox("contract-board-header", {
       width: 5.9,
@@ -163,6 +170,7 @@ export class FrontierContractDirector {
     header.position.y = 4.85;
     header.material = metal;
     header.parent = root;
+    metalMeshes.push(header);
 
     for (let index = 0; index < 6; index += 1) {
       const notice = BABYLON.MeshBuilder.CreateBox(`contract-board-notice-${index}`, {
@@ -178,6 +186,8 @@ export class FrontierContractDirector {
       notice.rotation.z = ((index % 3) - 1) * 0.035;
       notice.material = parchment;
       notice.parent = root;
+      parchmentMeshes.push(notice);
+
       const pin = BABYLON.MeshBuilder.CreateSphere(`contract-board-pin-${index}`, {
         diameter: 0.12,
         segments: 5
@@ -185,6 +195,7 @@ export class FrontierContractDirector {
       pin.position = notice.position.add(new BABYLON.Vector3(0, 0.39, -0.05));
       pin.material = index % 2 === 0 ? glow : metal;
       pin.parent = root;
+      (index % 2 === 0 ? glowMeshes : metalMeshes).push(pin);
     }
 
     const crest = BABYLON.MeshBuilder.CreateTorus("contract-board-guild-crest", {
@@ -196,11 +207,13 @@ export class FrontierContractDirector {
     crest.rotation.x = Math.PI / 2;
     crest.material = glow;
     crest.parent = root;
+    glowMeshes.push(crest);
 
-    root.getChildMeshes().forEach((mesh: any) => {
-      mesh.computeWorldMatrix(true);
-      mesh.freezeWorldMatrix();
-    });
+    this.mergeBoardGroup("batched-contract-board-timber", timberMeshes, true);
+    this.mergeBoardGroup("batched-contract-board-metal", metalMeshes, false);
+    this.mergeBoardGroup("batched-contract-board-parchment", parchmentMeshes, false);
+    this.mergeBoardGroup("batched-contract-board-glow", glowMeshes, false);
+    root.dispose();
 
     const collisionBoxes = (this.world as any).collisionBoxes as Array<{
       minX: number;
@@ -214,6 +227,25 @@ export class FrontierContractDirector {
       minZ: this.boardPosition.z - 0.9,
       maxZ: this.boardPosition.z + 0.9
     });
+  }
+
+  private mergeBoardGroup(name: string, meshes: any[], cameraCollision: boolean): void {
+    meshes.forEach((mesh) => mesh.computeWorldMatrix(true));
+    const merged = BABYLON.Mesh.MergeMeshes(meshes, true, true, undefined, false, false);
+    if (!merged) {
+      meshes.forEach((mesh) => {
+        mesh.metadata = cameraCollision ? { cameraCollision: true } : {};
+        mesh.isPickable = cameraCollision;
+        mesh.freezeWorldMatrix();
+      });
+      return;
+    }
+    merged.name = name;
+    merged.metadata = cameraCollision ? { cameraCollision: true } : {};
+    merged.isPickable = cameraCollision;
+    merged.receiveShadows = name.endsWith("timber");
+    merged.computeWorldMatrix(true);
+    merged.freezeWorldMatrix();
   }
 
   private installInteractionHook(): void {
