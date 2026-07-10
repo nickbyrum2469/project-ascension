@@ -47,6 +47,11 @@ export class CombatPresentationDirector {
       const mesh = this.scene.getMeshByName?.(name);
       if (mesh) mesh.scaling = new BABYLON.Vector3(x, y, z);
     };
+    const setPosition = (name: string, x: number, y: number, z: number): void => {
+      const mesh = this.scene.getMeshByName?.(name);
+      if (mesh) mesh.position = new BABYLON.Vector3(x, y, z);
+    };
+
     setScale("warden-left-upper-arm-mesh", 0.94, 1.06, 0.94);
     setScale("warden-right-upper-arm-mesh", 0.94, 1.06, 0.94);
     setScale("warden-left-forearm-mesh", 0.92, 1.08, 0.92);
@@ -56,6 +61,16 @@ export class CombatPresentationDirector {
     setScale("warden-left-shin-mesh", 0.93, 1.07, 0.93);
     setScale("warden-right-shin-mesh", 0.93, 1.07, 0.93);
     setScale("warden-head", 0.96, 0.98, 0.96);
+
+    setScale("fp-right-sleeve", 0.64, 0.76, 0.64);
+    setScale("fp-left-sleeve", 0.64, 0.76, 0.64);
+    setScale("fp-right-hand", 0.72, 0.8, 0.72);
+    setScale("fp-left-hand", 0.72, 0.8, 0.72);
+    setPosition("fp-right-sleeve", 0.03, -0.4, 0.02);
+    setPosition("fp-left-sleeve", -0.03, -0.4, 0.02);
+    setPosition("fp-right-hand", 0.02, -0.75, 0.02);
+    setPosition("fp-left-hand", -0.02, -0.75, 0.02);
+
     if (this.player.visual?.torso) {
       this.player.visual.torso.scaling = new BABYLON.Vector3(1.04, 1.02, 0.96);
     }
