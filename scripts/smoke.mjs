@@ -109,7 +109,10 @@ for (const requiredFeature of [
   "the aerial scar",
   "installfloortwosafety",
   "state.upperactive && game.player.root.position.y < state.upperfloory - 18",
-  "cameracollision: true"
+  "cameracollision: true",
+  "consolidatefloortwostaticgeometry",
+  "batched-floor-two-",
+  "batched ${sourcecount} floor two static meshes"
 ]) {
   if (!productionSource.includes(requiredFeature)) {
     throw new Error(`Missing required production feature: ${requiredFeature}`);
@@ -149,11 +152,25 @@ for (const forbiddenRuntimeAllocation of ["MeshBuilder.Create", "new BABYLON.PBR
 const mainSource = await readFile("src/main.ts", "utf8");
 const arrivalIndex = mainSource.indexOf("new FloorTwoArrivalDirector(game)");
 const safetyIndex = mainSource.indexOf("installFloorTwoSafety(game, floorTwo)");
+const batchIndex = mainSource.indexOf("consolidateFloorTwoStaticGeometry(game)");
+const performanceIndex = mainSource.indexOf("new PerformanceDirector(engine, game.world, renderer)");
 if (arrivalIndex < 0 || safetyIndex <= arrivalIndex) {
   throw new Error("Floor Two safety must wrap the player after the arrival director installs its upper movement surface.");
 }
+if (batchIndex <= safetyIndex || performanceIndex <= batchIndex) {
+  throw new Error("Floor Two static batching must occur after collision metadata and before the global performance director.");
+}
 if (!mainSource.includes('name === "floor-two-arrival-terrace"') || !mainSource.includes('name.includes("-rail-")')) {
   throw new Error("Visible Floor Two floor and rail geometry must participate in camera collision.");
+}
+for (const dynamicName of [
+  '"floor-two-rift-shear"',
+  '"floor-two-threshold-fragment"',
+  '"floor-two-survey-lens"'
+]) {
+  if (!mainSource.includes(dynamicName)) {
+    throw new Error(`Floor Two batching must preserve dynamic mesh family: ${dynamicName}`);
+  }
 }
 
 const manifest = JSON.parse(await readFile("public/assets/asset-manifest.json", "utf8"));
