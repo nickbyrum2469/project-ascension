@@ -1,0 +1,331 @@
+import { AudioDirector } from "../audio/AudioDirector.js";
+import { InputManager } from "../core/InputManager.js";
+import type { InputFrame } from "../data/GameTypes.js";
+import { Hud } from "../ui/Hud.js";
+import { World } from "../world/World.js";
+import { Player } from "./Player.js";
+import { QuestSystem } from "./QuestSystem.js";
+import { RiftBoar } from "./RiftBoar.js";
+
+interface TransientEffect {
+  root: any;
+  age: number;
+  duration: number;
+  heavy: boolean;
+}
+
+const emptyInput = (): InputFrame => ({
+  moveX: 0,
+  moveY: 0,
+  lookX: 0,
+  lookY: 0,
+  sprint: false,
+  block: false,
+  lightPressed: false,
+  heavyPressed: false,
+  dodgePressed: false,
+  jumpPressed: false,
+  interactPressed: false,
+  toggleViewPressed: false,
+  lockOnPressed: false,
+  pausePressed: false,
+  shoulderPressed: false
+});
+
+export class Game {
+  public readonly world: World;
+  private readonly audio = new AudioDirector();
+  private readonly hud = new Hud(this.audio);
+  private readonly input: InputManager;
+  private readonly quests: QuestSystem;
+  private readonly player: Player;
+  private readonly enemies: RiftBoar[];
+  private readonly effects: TransientEffect[] = [];
+  private started = false;
+  private paused = false;
+  private lastFrame = performance.now();
+  private elapsed = 0;
+
+  constructor(
+    private readonly engine: any,
+    private readonly canvas: HTMLCanvasElement,
+    rendererName: string
+  ) {
+    this.input = new InputManager(canvas);
+    this.world = new World(engine);
+    this.quests = new QuestSystem(this.hud, this.audio);
+    this.player = new Player(
+      this.world,
+      this.hud,
+      this.audio,
+      this.quests,
+      (position, heavy) => this.spawnImpact(position, heavy)
+    );
+    this.enemies = this.world.spawnPoints.map((point, index) => new RiftBoar(
+      this.world,
+      point.clone(),
+      index,
+      this.audio,
+      this.quests,
+      (amount, source) => this.player.receiveDamage(amount, source),
+      (position, heavy) => this.spawnImpact(position, heavy)
+    ));
+
+    this.hud.setRenderer(rendererName);
+    this.hud.setBootStatus("Foundation lattice synchronized. Field entry ready.");
+    this.hud.bindSettings(this.quests.save.settings, (settings) => {
+      this.quests.updateSettings(settings);
+      this.player.applySettings(settings);
+    });
+    this.player.applySettings(this.quests.save.settings);
+    this.bindUi();
+    this.registerServiceWorker();
+  }
+
+  public run(): void {
+    this.engine.runRenderLoop(() => {
+      const now = performance.now();
+      const delta = Math.min(0.05, Math.max(0.001, (now - this.lastFrame) / 1000));
+      this.lastFrame = now;
+      this.update(delta);
+      this.world.scene.render();
+    });
+    window.addEventListener("resize", () => this.engine.resize());
+  }
+
+  private bindUi(): void {
+    this.hud.enterButton.addEventListener("click", async () => {
+      await this.audio.unlock();
+      this.audio.uiConfirm();
+      this.started = true;
+      this.input.setEnabled(true);
+      this.hud.enterWorld();
+      this.canvas.focus();
+      this.input.requestPointerLock();
+      this.hud.notify("THREAD AWAKENED", "Windscar Verge is now under live expedition control.");
+    });
+
+    this.hud.resumeButton.addEventListener("click", () => this.setPaused(false));
+    this.canvas.addEventListener("click", () => {
+      if (this.started && !this.paused && !this.hud.isDialogueOpen()) this.input.requestPointerLock();
+    });
+  }
+
+  private update(delta: number): void {
+    this.elapsed += delta;
+    const sampled = this.started ? this.input.sample() : emptyInput();
+    if (sampled.pausePressed && this.started && !this.hud.isDialogueOpen()) {
+      this.setPaused(!this.paused);
+    }
+
+    const controlsEnabled = this.started && !this.paused && !this.hud.isDialogueOpen();
+    this.player.update(delta, sampled, this.enemies, controlsEnabled);
+
+    if (controlsEnabled) {
+      this.enemies.forEach((enemy) => enemy.update(delta, this.player.position(), this.player.blocking));
+      this.updateInteraction(sampled);
+    } else {
+      this.hud.setInteraction(null);
+    }
+
+    this.animateWorld(delta);
+    this.updateEffects(delta);
+  }
+
+  private updateInteraction(input: InputFrame): void {
+    const playerPosition = this.player.position();
+    const maraPosition = this.world.mara.root.position;
+    const maraDistance = BABYLON.Vector3.Distance(playerPosition, maraPosition);
+    const markerDistance = BABYLON.Vector3.Distance(playerPosition, this.world.markerPosition);
+
+    if (maraDistance <= 3.25) {
+      this.hud.setInteraction("Speak with Mara Venn");
+      if (input.interactPressed) this.openMaraDialogue();
+      return;
+    }
+
+    if (markerDistance <= 3.5 && this.quests.save.quest.accepted && !this.quests.save.quest.markerInvestigated) {
+      this.hud.setInteraction("Inspect the resonant marker");
+      if (input.interactPressed) {
+        this.quests.investigateMarker();
+        this.spawnMarkerPulse();
+      }
+      return;
+    }
+
+    this.hud.setInteraction(null);
+  }
+
+  private openMaraDialogue(): void {
+    this.input.releasePointerLock();
+    const quest = this.quests.save.quest;
+    if (!quest.accepted) {
+      this.hud.showDialogue(
+        "Mara Venn",
+        "MV",
+        "The boars are not feeding. They are circling the old aqueduct whenever the ground begins to hum. Cull the worst of the herd, then inspect the cyan marker beyond the red grass. I need proof before the guild seals the western road.",
+        [
+          {
+            label: "I’ll trace the disturbance.",
+            action: () => {
+              this.quests.accept();
+              this.closeDialogue();
+            }
+          },
+          {
+            label: "Tell me about the marker.",
+            action: () => this.hud.showDialogue(
+              "Mara Venn",
+              "MV",
+              "It predates Caelus Reach. The ring pattern matches the support pillars, but the pulse is coming from below us—not above. Whatever is buried there has started waking up.",
+              [{ label: "Understood.", action: () => this.closeDialogue() }]
+            )
+          }
+        ]
+      );
+      return;
+    }
+
+    if (this.quests.canComplete()) {
+      this.hud.showDialogue(
+        "Mara Venn",
+        "MV",
+        "Three carcasses carried the same fracture dust, and your marker reading confirms a hollow chamber beneath the aqueduct. This is no animal migration. You found the first thread toward the buried Foundry.",
+        [{
+          label: "Record the route and attune the relic.",
+          action: () => {
+            this.quests.complete();
+            this.player.visual.rune.material.emissiveIntensity = 1.7;
+            this.spawnImpact(this.player.position().add(new BABYLON.Vector3(0, 1.2, 0)), true);
+            this.closeDialogue();
+          }
+        }]
+      );
+      return;
+    }
+
+    if (quest.completed) {
+      this.hud.showDialogue(
+        "Mara Venn",
+        "MV",
+        "The guild has begun charting the underground resonance. This was only the first lock. When the Foundry opens, the whole floor will feel it.",
+        [{ label: "Then we’ll be ready.", action: () => this.closeDialogue() }]
+      );
+      return;
+    }
+
+    const hunt = Math.min(3, quest.boarsDefeated);
+    const marker = quest.markerInvestigated ? "The marker’s signal is logged." : "The marker still needs a direct reading.";
+    this.hud.showDialogue(
+      "Mara Venn",
+      "MV",
+      `The road remains unstable. You have confirmed ${hunt} of 3 rift boars. ${marker}`,
+      [{ label: "I’ll continue the sweep.", action: () => this.closeDialogue() }]
+    );
+  }
+
+  private closeDialogue(): void {
+    this.hud.hideDialogue();
+    if (!this.paused) this.input.requestPointerLock();
+  }
+
+  private setPaused(paused: boolean): void {
+    this.paused = paused;
+    this.hud.setPause(paused);
+    this.input.setEnabled(!paused);
+    if (paused) {
+      this.input.releasePointerLock();
+      this.audio.uiConfirm();
+    } else {
+      this.canvas.focus();
+      this.input.requestPointerLock();
+      this.audio.uiConfirm();
+    }
+  }
+
+  private animateWorld(delta: number): void {
+    const mara = this.world.mara;
+    mara.hips.position.y = 0.92 + Math.sin(this.elapsed * 1.8) * 0.012;
+    mara.cape.rotation.x = 0.08 + Math.sin(this.elapsed * 1.2) * 0.025;
+    mara.head.rotation.y = Math.sin(this.elapsed * 0.42) * 0.09;
+    mara.rune.scaling.setAll(1 + Math.sin(this.elapsed * 2.6) * 0.05);
+
+    this.world.marker.rotation.y += delta * 0.18;
+    const rings = this.world.marker.getChildMeshes?.() ?? [];
+    rings.forEach((mesh: any, index: number) => {
+      if (!mesh.name.includes("marker-ring")) return;
+      const pulse = 1 + Math.sin(this.elapsed * 3 + index * 0.8) * 0.08;
+      mesh.scaling.setAll(pulse);
+      mesh.rotation.y += delta * (index % 2 ? -0.45 : 0.55);
+    });
+  }
+
+  private spawnImpact(position: any, heavy: boolean): void {
+    const root = new BABYLON.TransformNode(`impact-${performance.now()}`, this.world.scene);
+    root.position.copyFrom(position);
+    const material = new BABYLON.PBRMaterial(`impact-material-${performance.now()}`, this.world.scene);
+    material.albedoColor = BABYLON.Color3.FromHexString(heavy ? "#e9fbff" : "#71e8ff");
+    material.emissiveColor = BABYLON.Color3.FromHexString(heavy ? "#9bf5ff" : "#22cbe7");
+    material.emissiveIntensity = heavy ? 2.8 : 1.9;
+    material.metallic = 0.1;
+    material.roughness = 0.18;
+
+    const ring = BABYLON.MeshBuilder.CreateTorus(`impact-ring-${performance.now()}`, {
+      diameter: heavy ? 1.5 : 0.9,
+      thickness: heavy ? 0.055 : 0.035,
+      tessellation: 28
+    }, this.world.scene);
+    ring.material = material;
+    ring.rotation.x = Math.PI / 2;
+    ring.parent = root;
+
+    const shardCount = heavy ? 12 : 7;
+    for (let index = 0; index < shardCount; index += 1) {
+      const shard = BABYLON.MeshBuilder.CreatePolyhedron(`impact-shard-${index}-${performance.now()}`, {
+        type: 1,
+        size: heavy ? 0.13 : 0.085
+      }, this.world.scene);
+      shard.material = material;
+      const angle = (index / shardCount) * Math.PI * 2;
+      shard.position = new BABYLON.Vector3(Math.cos(angle) * 0.36, Math.sin(index * 2.3) * 0.18, Math.sin(angle) * 0.36);
+      shard.rotation = new BABYLON.Vector3(angle, angle * 0.7, angle * 1.3);
+      shard.metadata = { direction: new BABYLON.Vector3(Math.cos(angle), 0.3 + (index % 3) * 0.12, Math.sin(angle)) };
+      shard.parent = root;
+    }
+
+    this.effects.push({ root, age: 0, duration: heavy ? 0.55 : 0.38, heavy });
+  }
+
+  private spawnMarkerPulse(): void {
+    const point = this.world.markerPosition.add(new BABYLON.Vector3(0, 1.4, 0));
+    this.spawnImpact(point, true);
+    this.spawnImpact(point.add(new BABYLON.Vector3(0, 0.8, 0)), false);
+  }
+
+  private updateEffects(delta: number): void {
+    for (let index = this.effects.length - 1; index >= 0; index -= 1) {
+      const effect = this.effects[index];
+      effect.age += delta;
+      const progress = effect.age / effect.duration;
+      const scale = 0.2 + progress * (effect.heavy ? 2.3 : 1.6);
+      effect.root.scaling.setAll(scale);
+      effect.root.rotation.y += delta * 5.5;
+      effect.root.getChildMeshes().forEach((mesh: any) => {
+        if (mesh.metadata?.direction) mesh.position.addInPlace(mesh.metadata.direction.scale(delta * (effect.heavy ? 2.4 : 1.7)));
+        if (mesh.material) mesh.material.alpha = Math.max(0, 1 - progress);
+      });
+      if (progress >= 1) {
+        effect.root.getChildMeshes().forEach((mesh: any) => mesh.dispose(false, true));
+        effect.root.dispose();
+        this.effects.splice(index, 1);
+      }
+    }
+  }
+
+  private registerServiceWorker(): void {
+    if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
+    window.addEventListener("load", () => {
+      void navigator.serviceWorker.register("./sw.js").catch(() => undefined);
+    });
+  }
+}

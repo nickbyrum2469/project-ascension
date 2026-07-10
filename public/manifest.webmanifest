@@ -1,0 +1,17 @@
+{
+  "name": "Project Ascension — The Verdant Foundation",
+  "short_name": "Ascension",
+  "description": "A first- and third-person action RPG inside a colossal layered megastructure.",
+  "start_url": "./",
+  "display": "fullscreen",
+  "background_color": "#040b13",
+  "theme_color": "#08111c",
+  "icons": [
+    {
+      "src": "./assets/branding/ascension-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

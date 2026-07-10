@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#08111c" />
+    <meta name="description" content="Project Ascension — conquer a living world hidden inside a colossal megastructure." />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./assets/branding/ascension-mark.svg" type="image/svg+xml" />
+    <title>Project Ascension — The Verdant Foundation</title>
+    <link rel="preconnect" href="https://cdn.babylonjs.com" crossorigin />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main id="game-shell" aria-label="Project Ascension game">
+      <canvas id="render-canvas" tabindex="0" aria-label="Project Ascension 3D world"></canvas>
+
+      <section id="boot-screen" class="screen-layer boot-screen" aria-live="polite">
+        <div class="boot-vignette"></div>
+        <div class="boot-card">
+          <div class="sigil" aria-hidden="true">
+            <span class="sigil-ring sigil-ring-a"></span>
+            <span class="sigil-ring sigil-ring-b"></span>
+            <span class="sigil-core"></span>
+          </div>
+          <p class="eyebrow">FLOOR I · THE VERDANT FOUNDATION</p>
+          <h1>PROJECT <span>ASCENSION</span></h1>
+          <p class="boot-copy">
+            Caelus Reach has heard machinery beneath the western grasslands. Find the source. Survive what guards it.
+          </p>
+          <button id="enter-world" class="primary-action" type="button">
+            <span class="button-flare"></span>
+            <span>Enter the Foundation</span>
+            <kbd>CLICK</kbd>
+          </button>
+          <div class="boot-controls" aria-label="Core controls">
+            <span><kbd>WASD</kbd> Move</span>
+            <span><kbd>MOUSE</kbd> Look</span>
+            <span><kbd>LMB</kbd> Strike</span>
+            <span><kbd>RMB</kbd> Guard</span>
+            <span><kbd>V</kbd> View</span>
+            <span><kbd>E</kbd> Interact</span>
+          </div>
+          <div id="boot-status" class="boot-status">Preparing the world…</div>
+        </div>
+      </section>
+
+      <section id="hud" class="hud hidden" aria-live="polite">
+        <div class="hud-top-left">
+          <div class="region-banner">
+            <div class="region-kicker">CAELUS REACH OUTSKIRTS</div>
+            <div class="region-title">Windscar Verge</div>
+          </div>
+          <article id="quest-card" class="quest-card">
+            <div class="quest-header">
+              <span class="quest-rune">◇</span>
+              <div>
+                <small>ACTIVE THREAD</small>
+                <strong id="quest-title">A Quiet Morning</strong>
+              </div>
+            </div>
+            <p id="quest-description">Speak with Mara Venn near the expedition lantern.</p>
+            <ul id="quest-objectives"></ul>
+          </article>
+        </div>
+
+        <div class="hud-top-center">
+          <div class="compass-shell">
+            <span id="compass-west">W</span>
+            <span class="compass-ticks"></span>
+            <strong id="compass-heading">N</strong>
+            <span class="compass-ticks"></span>
+            <span id="compass-east">E</span>
+          </div>
+          <div id="target-frame" class="target-frame hidden">
+            <span id="target-name">Rift Boar</span>
+            <div class="target-bar"><i id="target-health"></i></div>
+          </div>
+        </div>
+
+        <div class="hud-top-right">
+          <div id="camera-mode" class="mode-chip"><span>◉</span> THIRD PERSON</div>
+          <div id="performance-chip" class="mode-chip subtle"><span>◆</span> WEBGL</div>
+        </div>
+
+        <div id="interaction-prompt" class="interaction-prompt hidden">
+          <kbd>E</kbd><span id="interaction-label">Speak</span>
+        </div>
+
+        <div class="hud-bottom">
+          <div class="vitals">
+            <div class="portrait-sigil"><span>AV</span></div>
+            <div class="vital-stack">
+              <div class="vital-row health-row">
+                <span>VITALITY</span>
+                <div class="bar-shell"><i id="health-bar"></i><b id="health-value">100</b></div>
+              </div>
+              <div class="vital-row stamina-row">
+                <span>STAMINA</span>
+                <div class="bar-shell"><i id="stamina-bar"></i><b id="stamina-value">100</b></div>
+              </div>
+              <div class="vital-row focus-row">
+                <span>FOCUS</span>
+                <div class="bar-shell"><i id="focus-bar"></i><b id="focus-value">0</b></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ability-rack" aria-label="Combat actions">
+            <div class="ability-slot"><span class="ability-icon icon-strike"></span><kbd>LMB</kbd><small>Edge</small></div>
+            <div class="ability-slot"><span class="ability-icon icon-heavy"></span><kbd>Q</kbd><small>Breaker</small></div>
+            <div class="ability-slot"><span class="ability-icon icon-guard"></span><kbd>RMB</kbd><small>Guard</small></div>
+            <div class="ability-slot"><span class="ability-icon icon-dodge"></span><kbd>CTRL</kbd><small>Step</small></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="dialogue-panel" class="dialogue-panel hidden" aria-modal="true" role="dialog">
+        <div class="speaker-medallion"><span id="speaker-initials">MV</span></div>
+        <div class="dialogue-content">
+          <div class="dialogue-name" id="speaker-name">Mara Venn</div>
+          <p id="dialogue-text"></p>
+          <div id="dialogue-choices" class="dialogue-choices"></div>
+        </div>
+      </section>
+
+      <section id="pause-panel" class="pause-panel hidden" aria-modal="true" role="dialog">
+        <div class="pause-card">
+          <p class="eyebrow">SYSTEM LATTICE</p>
+          <h2>Field Settings</h2>
+          <label>
+            Look sensitivity
+            <input id="sensitivity-setting" type="range" min="0.2" max="2" step="0.05" value="0.8" />
+          </label>
+          <label>
+            Field of view
+            <input id="fov-setting" type="range" min="60" max="100" step="1" value="75" />
+          </label>
+          <label class="toggle-row">
+            Camera shake
+            <input id="shake-setting" type="checkbox" checked />
+          </label>
+          <button id="resume-game" class="primary-action compact" type="button">Resume Expedition</button>
+        </div>
+      </section>
+
+      <div id="notification-stack" class="notification-stack" aria-live="polite"></div>
+      <div id="damage-flash" class="damage-flash"></div>
+      <div id="crosshair" class="crosshair hidden" aria-hidden="true"><i></i><b></b></div>
+    </main>
+
+    <script src="https://cdn.babylonjs.com/babylon.js" crossorigin="anonymous"></script>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
