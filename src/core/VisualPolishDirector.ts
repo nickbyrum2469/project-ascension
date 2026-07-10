@@ -4,6 +4,13 @@ interface StaticGroup {
   receiveShadows: boolean;
 }
 
+interface CollisionBox {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+
 export class VisualPolishDirector {
   private readonly scene: any;
   private readonly world: any;
@@ -12,11 +19,25 @@ export class VisualPolishDirector {
     this.scene = game.world.scene;
     this.world = game.world;
 
+    this.clearCentralGateCollision();
     this.replaceBrightRouteBatches();
     this.rebuildSpawnToFrontierPath();
     this.rebuildCaelusBoulevard();
     this.enrichFrontierApproach();
     this.stabilizeGateBanners();
+  }
+
+  private clearCentralGateCollision(): void {
+    const boxes = this.world.collisionBoxes as CollisionBox[];
+    if (!Array.isArray(boxes)) return;
+    for (let index = boxes.length - 1; index >= 0; index -= 1) {
+      const box = boxes[index];
+      const intersectsCentralOpening = box.minX < 5
+        && box.maxX > -5
+        && box.minZ < 27
+        && box.maxZ > 14;
+      if (intersectsCentralOpening) boxes.splice(index, 1);
+    }
   }
 
   private replaceBrightRouteBatches(): void {
