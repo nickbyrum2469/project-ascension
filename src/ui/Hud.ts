@@ -152,18 +152,20 @@ export class Hud {
     } else if (!labyrinth.coreRestored) {
       this.questTitle.textContent = "The Foundry Below";
       this.questDescription.textContent = labyrinth.entered
-        ? "Synchronize the three relay sigils and restore the buried pillar core."
+        ? "Synchronize the relays, dismantle the Sentinel, and restore the buried pillar core."
         : "Reach the breach beneath the eastern support pillar.";
       this.appendObjective("Enter the Foundry Labyrinth", labyrinth.entered);
       labyrinth.sigilsActivated.forEach((active, index) => {
         this.appendObjective(`Attune relay sigil ${index + 1}`, active);
       });
-      if (labyrinth.sigilsActivated.every(Boolean)) {
+      this.appendObjective("Defeat the Foundry Sentinel", labyrinth.guardianDefeated);
+      if (labyrinth.sigilsActivated.every(Boolean) && labyrinth.guardianDefeated) {
         this.appendObjective("Restore the pillar core", false);
       }
     } else {
       this.questTitle.textContent = "Pillar of Ash and Glass";
       this.questDescription.textContent = "The Foundry core is stable and the first permanent ascent route is taking shape.";
+      this.appendObjective("Foundry Sentinel dismantled", labyrinth.guardianDefeated);
       this.appendObjective("Foundry pillar core restored", true);
       this.appendObjective("Permanent return shortcut opened", labyrinth.shortcutOpened);
     }
