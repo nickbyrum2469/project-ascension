@@ -181,15 +181,18 @@ export class VisualPolishDirector {
 
   private stabilizeGateBanners(): void {
     const banner = this.scene.getMeshByName?.("caelus-gate-banners-batch");
-    if (banner) banner.material = this.unlitMaterial("caelus-gate-banner-unlit", "#31566a");
+    if (banner) {
+      banner.material = this.unlitMaterial("caelus-gate-banner-unlit", "#31566a");
+      this.world.glowLayer?.addExcludedMesh?.(banner);
+    }
   }
 
   private unlitMaterial(name: string, hex: string): any {
     const material = new BABYLON.StandardMaterial(name, this.scene);
     material.disableLighting = true;
-    material.diffuseColor = BABYLON.Color3.Black();
+    material.diffuseColor = BABYLON.Color3.FromHexString(hex);
     material.specularColor = BABYLON.Color3.Black();
-    material.emissiveColor = BABYLON.Color3.FromHexString(hex);
+    material.emissiveColor = BABYLON.Color3.Black();
     material.freeze();
     return material;
   }
@@ -202,6 +205,7 @@ export class VisualPolishDirector {
     merged.name = group.name;
     merged.receiveShadows = group.receiveShadows;
     merged.isPickable = false;
+    this.world.glowLayer?.addExcludedMesh?.(merged);
     merged.computeWorldMatrix(true);
     merged.freezeWorldMatrix();
   }
