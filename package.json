@@ -1,0 +1,21 @@
+{
+  "name": "project-ascension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Project Ascension — browser-based first/third-person action RPG foundation.",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "check": "tsc --noEmit",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test:smoke": "node scripts/smoke-test.mjs"
+  },
+  "dependencies": {
+    "babylonjs": "9.16.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vite": "^7.0.0"
+  }
+}

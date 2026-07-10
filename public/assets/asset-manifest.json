@@ -1,0 +1,43 @@
+{
+  "project": "Project Ascension",
+  "manifestVersion": 1,
+  "policy": "Every visible or audible asset must be original or have a recorded commercial-use license.",
+  "assets": [
+    {
+      "id": "ascension-brand-mark",
+      "type": "vector-branding",
+      "creator": "Project Ascension production",
+      "source": "public/assets/branding/ascension-mark.svg",
+      "license": "Original project asset — all rights reserved",
+      "modifications": "Source master",
+      "usage": "Favicon, PWA icon, project identity"
+    },
+    {
+      "id": "foundation-procedural-world",
+      "type": "runtime-3d-art",
+      "creator": "Project Ascension production",
+      "source": "src/world/ProceduralAssets.ts and src/world/World.ts",
+      "license": "Original project asset — all rights reserved",
+      "modifications": "Generated at runtime from authored geometry, materials, and seeded layouts",
+      "usage": "Warden, Mara Venn, Rift Boars, Windscar terrain, foliage, Caelus gate, aqueduct, megastructure pillars, resonant marker"
+    },
+    {
+      "id": "foundation-procedural-audio",
+      "type": "runtime-audio",
+      "creator": "Project Ascension production",
+      "source": "src/audio/AudioDirector.ts",
+      "license": "Original project asset — all rights reserved",
+      "modifications": "Generated with Web Audio oscillators, envelopes, filters, and noise synthesis",
+      "usage": "Ambience, UI feedback, footsteps, attacks, impacts, guard, damage, quest stingers"
+    },
+    {
+      "id": "babylonjs-runtime",
+      "type": "software-library",
+      "creator": "Babylon.js contributors",
+      "source": "https://cdn.babylonjs.com/babylon.js",
+      "license": "Apache-2.0",
+      "usage": "Browser 3D rendering runtime",
+      "attributionRequired": false
+    }
+  ]
+}
