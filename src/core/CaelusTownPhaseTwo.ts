@@ -123,17 +123,16 @@ const samplePath = (control: TownPoint[], samplesPerSection: number): TownPoint[
   return points;
 };
 
-const createMaterial = (
+const createGroundMaterial = (
   scene: any,
   name: string,
-  albedo: string,
-  roughness: number,
-  metallic = 0
+  diffuse: string
 ): any => {
-  const material = new BABYLON.PBRMaterial(name, scene);
-  material.albedoColor = BABYLON.Color3.FromHexString(albedo);
-  material.roughness = roughness;
-  material.metallic = metallic;
+  const material = new BABYLON.StandardMaterial(name, scene);
+  material.diffuseColor = BABYLON.Color3.FromHexString(diffuse);
+  material.ambientColor = BABYLON.Color3.FromHexString(diffuse).scale(0.22);
+  material.specularColor = BABYLON.Color3.Black();
+  material.emissiveColor = BABYLON.Color3.Black();
   material.alpha = 1;
   material.transparencyMode = 0;
   material.forceDepthWrite = true;
@@ -141,7 +140,7 @@ const createMaterial = (
   return material;
 };
 
-const createOffsetBand = (
+const createDrainageChannel = (
   scene: any,
   world: any,
   name: string,
@@ -149,8 +148,6 @@ const createOffsetBand = (
   offset: number,
   halfWidth: number,
   heightOffset: number,
-  surfaceVariation: number,
-  purpose: "road-curb" | "drainage-channel",
   material: any
 ): any => {
   const positions: number[] = [];
@@ -167,12 +164,11 @@ const createOffsetBand = (
     const normalZ = deltaX / length;
     const centerX = path[index].x + normalX * offset;
     const centerZ = path[index].z + normalZ * offset;
-    const masonryUndulation = Math.sin(index * 2.37) * surfaceVariation;
 
     for (const side of [-1, 1]) {
       const x = centerX + normalX * halfWidth * side;
       const z = centerZ + normalZ * halfWidth * side;
-      positions.push(x, world.heightAt(x, z) + heightOffset + masonryUndulation, z);
+      positions.push(x, world.heightAt(x, z) + heightOffset, z);
     }
   }
 
@@ -194,9 +190,100 @@ const createOffsetBand = (
   mesh.isPickable = false;
   mesh.metadata = {
     phase: 2,
-    purpose,
+    purpose: "drainage-channel",
     halfWidth,
     heightOffset
+  };
+  mesh.computeWorldMatrix(true);
+  mesh.freezeWorldMatrix();
+  return mesh;
+};
+
+const createSegmentedCurb = (
+  scene: any,
+  world: any,
+  name: string,
+  path: TownPoint[],
+  offset: number,
+  halfWidth: number,
+  baseOffset: number,
+  blockHeight: number,
+  gapRatio: number,
+  material: any
+): any => {
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const normals: number[] = [];
+  let blockCount = 0;
+
+  for (let index = 0; index < path.length - 1; index += 1) {
+    const start = path[index];
+    const end = path[index + 1];
+    const deltaX = end.x - start.x;
+    const deltaZ = end.z - start.z;
+    const length = Math.hypot(deltaX, deltaZ);
+    if (length < 0.15) continue;
+
+    const tangentX = deltaX / length;
+    const tangentZ = deltaZ / length;
+    const normalX = -tangentZ;
+    const normalZ = tangentX;
+    const centerX = (start.x + end.x) * 0.5 + normalX * offset;
+    const centerZ = (start.z + end.z) * 0.5 + normalZ * offset;
+    const halfLength = length * (1 - gapRatio) * 0.5;
+    const corners = [
+      { x: centerX - tangentX * halfLength - normalX * halfWidth, z: centerZ - tangentZ * halfLength - normalZ * halfWidth },
+      { x: centerX + tangentX * halfLength - normalX * halfWidth, z: centerZ + tangentZ * halfLength - normalZ * halfWidth },
+      { x: centerX + tangentX * halfLength + normalX * halfWidth, z: centerZ + tangentZ * halfLength + normalZ * halfWidth },
+      { x: centerX - tangentX * halfLength + normalX * halfWidth, z: centerZ - tangentZ * halfLength + normalZ * halfWidth }
+    ];
+    const vertexBase = positions.length / 3;
+    const blockVariation = Math.sin(index * 1.91) * 0.014;
+
+    for (const corner of corners) {
+      const ground = world.heightAt(corner.x, corner.z) + baseOffset + blockVariation;
+      positions.push(corner.x, ground, corner.z);
+    }
+    for (const corner of corners) {
+      const ground = world.heightAt(corner.x, corner.z) + baseOffset + blockVariation;
+      positions.push(corner.x, ground + blockHeight, corner.z);
+    }
+
+    indices.push(
+      vertexBase, vertexBase + 2, vertexBase + 1,
+      vertexBase, vertexBase + 3, vertexBase + 2,
+      vertexBase + 4, vertexBase + 5, vertexBase + 6,
+      vertexBase + 4, vertexBase + 6, vertexBase + 7,
+      vertexBase, vertexBase + 1, vertexBase + 5,
+      vertexBase, vertexBase + 5, vertexBase + 4,
+      vertexBase + 1, vertexBase + 2, vertexBase + 6,
+      vertexBase + 1, vertexBase + 6, vertexBase + 5,
+      vertexBase + 2, vertexBase + 3, vertexBase + 7,
+      vertexBase + 2, vertexBase + 7, vertexBase + 6,
+      vertexBase + 3, vertexBase, vertexBase + 4,
+      vertexBase + 3, vertexBase + 4, vertexBase + 7
+    );
+    blockCount += 1;
+  }
+
+  BABYLON.VertexData.ComputeNormals(positions, indices, normals);
+  const data = new BABYLON.VertexData();
+  data.positions = positions;
+  data.indices = indices;
+  data.normals = normals;
+  const mesh = new BABYLON.Mesh(name, scene);
+  data.applyToMesh(mesh);
+  mesh.material = material;
+  mesh.receiveShadows = true;
+  mesh.isPickable = false;
+  mesh.metadata = {
+    phase: 2,
+    purpose: "segmented-road-curb",
+    halfWidth,
+    heightOffset: baseOffset,
+    blockHeight,
+    gapRatio,
+    blockCount
   };
   mesh.computeWorldMatrix(true);
   mesh.freezeWorldMatrix();
@@ -229,7 +316,7 @@ export class CaelusTownPhaseTwo {
       phaseTwoWellRecovered: wellRecovered,
       phaseTwoDrainageBands: drainageBands,
       phaseTwoCollisionAudit: collisionAudit,
-      phaseTwoRoadVisualRevision: 2
+      phaseTwoRoadVisualRevision: 3
     };
   }
 
@@ -266,35 +353,33 @@ export class CaelusTownPhaseTwo {
   }
 
   private buildRoadDrainageBands(): number {
-    const stone = createMaterial(this.scene, "caelus-phase2-drainage-stone", "#3d4743", 0.99, 0);
-    const channel = createMaterial(this.scene, "caelus-phase2-drainage-channel", "#252e2c", 1, 0);
+    const stone = createGroundMaterial(this.scene, "caelus-phase2-drainage-stone", "#303936");
+    const channel = createGroundMaterial(this.scene, "caelus-phase2-drainage-channel", "#18211f");
     let count = 0;
 
     for (const definition of ROAD_DEFINITIONS) {
       const path = samplePath(definition.control, definition.samplesPerSection);
       for (const side of [-1, 1]) {
-        createOffsetBand(
+        createSegmentedCurb(
           this.scene,
           this.world,
           `caelus-phase2-${definition.id}-curb-${side < 0 ? "left" : "right"}`,
           path,
           definition.edgeOffset * side,
-          0.24,
-          0.082,
-          0.006,
-          "road-curb",
+          0.22,
+          0.032,
+          0.14,
+          0.28,
           stone
         );
-        createOffsetBand(
+        createDrainageChannel(
           this.scene,
           this.world,
           `caelus-phase2-${definition.id}-channel-${side < 0 ? "left" : "right"}`,
           path,
-          (definition.edgeOffset - 0.58) * side,
-          0.15,
-          0.058,
-          0.002,
-          "drainage-channel",
+          (definition.edgeOffset - 0.54) * side,
+          0.14,
+          0.045,
           channel
         );
         count += 2;
@@ -310,9 +395,11 @@ export class CaelusTownPhaseTwo {
     const road = this.scene.getMaterialByName?.("caelus-phase1-road");
     if (road) {
       road.unfreeze?.();
-      road.albedoColor = BABYLON.Color3.FromHexString("#41463f");
+      road.albedoColor = BABYLON.Color3.FromHexString("#3b423c");
       road.roughness = 1;
       road.metallic = 0;
+      road.environmentIntensity = 0.24;
+      road.directIntensity = 0.68;
       road.alpha = 1;
       road.transparencyMode = 0;
       road.forceDepthWrite = true;
@@ -323,9 +410,12 @@ export class CaelusTownPhaseTwo {
     const roadEdge = this.scene.getMaterialByName?.("caelus-phase1-road-edge");
     if (roadEdge) {
       roadEdge.unfreeze?.();
-      roadEdge.albedoColor = BABYLON.Color3.FromHexString("#4d544c");
+      roadEdge.albedoColor = BABYLON.Color3.FromHexString("#333a35");
       roadEdge.roughness = 1;
       roadEdge.metallic = 0;
+      roadEdge.environmentIntensity = 0.08;
+      roadEdge.directIntensity = 0.42;
+      roadEdge.unlit = true;
       roadEdge.alpha = 1;
       roadEdge.transparencyMode = 0;
       roadEdge.forceDepthWrite = true;
