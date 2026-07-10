@@ -9,6 +9,7 @@ interface PlaytestCheckpoint {
 
 const checkpoints: Record<string, PlaytestCheckpoint> = {
   spawn: { x: 0, z: -2, yaw: Math.PI },
+  "frontier-combat": { x: 0, z: -60, yaw: Math.PI },
   "gate-exterior": { x: 0, z: 5, yaw: 0 },
   "city-boulevard": { x: 0, z: 74, yaw: 0 },
   "city-plaza": { x: 0, z: 112, yaw: 0 },
@@ -112,7 +113,6 @@ export class PlaytestBridge {
     if (!checkpoint) throw new Error(`Unknown playtest checkpoint: ${name}`);
     this.clearInput();
     this.teleport(checkpoint.x, checkpoint.z, checkpoint.yaw);
-    this.renderFrame();
     return this.snapshot();
   }
 
