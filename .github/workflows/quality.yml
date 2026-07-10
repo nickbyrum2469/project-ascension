@@ -2,7 +2,7 @@ name: Foundation Quality Gate
 
 on:
   push:
-    branches: [main, "foundation/**"]
+    branches: [main, "foundation/**", "milestone-**"]
   pull_request:
     branches: [main]
 
@@ -12,7 +12,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -46,4 +46,22 @@ jobs:
           name: project-ascension-browser-build
           path: dist
           if-no-files-found: error
+          retention-days: 14
+      - name: Install pinned browser playtest runtime
+        run: npm install --no-save --package-lock=false @playwright/test@1.55.0
+      - name: Install Chromium and system libraries
+        run: npx playwright install --with-deps chromium
+      - name: Browser vertical-slice playtest
+        run: npm run test:browser
+        env:
+          CI: "true"
+      - name: Upload browser playtest evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-ascension-browser-playtest
+          path: |
+            test-results/browser
+            playwright-report
+          if-no-files-found: warn
           retention-days: 14

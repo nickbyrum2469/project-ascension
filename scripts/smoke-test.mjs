@@ -5,6 +5,14 @@ const requiredFiles = [
   "index.html",
   "src/main.ts",
   "src/core/PerformanceDirector.ts",
+  "src/core/PlaytestBridge.ts",
+  "src/core/VerticalSliceDirector.ts",
+  "src/core/VerticalSliceRuntimeGuard.ts",
+  "src/core/VerticalSliceActorRebase.ts",
+  "src/core/VerticalSliceTraversalGuard.ts",
+  "src/core/CombatPresentationDirector.ts",
+  "src/audio/RouteAudioDirector.ts",
+  "src/combat-presentation.css",
   "src/game/Game.ts",
   "src/game/Player.ts",
   "src/game/QuestSystem.ts",
@@ -17,6 +25,9 @@ const requiredFiles = [
   "src/ui/ExpeditionJournal.ts",
   "src/ui/LoadoutOverlay.ts",
   "src/audio/AudioDirector.ts",
+  "playwright.config.mts",
+  "tests/browser/vertical-slice.spec.mts",
+  ".github/workflows/quality.yml",
   "public/assets/asset-manifest.json",
   "public/assets/branding/ascension-mark.svg"
 ];
@@ -32,6 +43,13 @@ for (const id of ids) {
 const sourceFiles = await Promise.all([
   "src/main.ts",
   "src/core/PerformanceDirector.ts",
+  "src/core/PlaytestBridge.ts",
+  "src/core/VerticalSliceDirector.ts",
+  "src/core/VerticalSliceRuntimeGuard.ts",
+  "src/core/VerticalSliceActorRebase.ts",
+  "src/core/VerticalSliceTraversalGuard.ts",
+  "src/core/CombatPresentationDirector.ts",
+  "src/audio/RouteAudioDirector.ts",
   "src/game/Game.ts",
   "src/game/Player.ts",
   "src/game/QuestSystem.ts",
@@ -118,7 +136,34 @@ for (const requiredFeature of [
   "shadowmap.resize(1024)",
   "antialias: false",
   "new babylon.engine(canvas, false",
-  "dust.emitrate"
+  "dust.emitrate",
+  "__ascension_playtest__",
+  "geometryaudit",
+  "unlockverticalslice",
+  "simulate: (seconds",
+  "this.game.update(1 / 60)",
+  "verticalsliceversion: 2",
+  "sculptedheightat",
+  "vertical-slice-caelus-boulevard",
+  "vertical-slice-city-bodies-a",
+  "vertical-slice-market-canopies",
+  "vertical-slice-road-surface",
+  "vertical-slice-route-bushes-a",
+  "vertical-slice-foundry-cliff-wall",
+  "vertical-slice-foundry-tunnel-floor",
+  "vertical-slice-core-to-pillar-catwalk",
+  "vertical-slice-pillar-shell",
+  "__routedensityguardinstalled",
+  "new verticalsliceactorrebase",
+  "dynamicactorsrebased",
+  "new verticalslicetraversalguard",
+  "protectedroutecollisionvolumesremoved",
+  "new combatpresentationdirector",
+  "combat-stance-indicator",
+  "combat-impact-burst",
+  "regionat(position.x, position.y, position.z)",
+  "new routeaudiodirector",
+  "foundrygain"
 ]) {
   if (!productionSource.includes(requiredFeature)) {
     throw new Error(`Missing required production feature: ${requiredFeature}`);
@@ -145,6 +190,66 @@ const mainSource = await readFile("src/main.ts", "utf8");
 if (mainSource.includes("new BABYLON.Engine(canvas, true")) {
   throw new Error("Engine-level antialiasing must remain disabled while FXAA is active.");
 }
+const recoveryIndex = mainSource.indexOf("new VisualRecoveryDirector(game)");
+const guardIndex = mainSource.indexOf("installVerticalSliceRuntimeGuard(VerticalSliceDirector)");
+const sliceIndex = mainSource.indexOf("new VerticalSliceDirector(game)");
+const actorRebaseIndex = mainSource.indexOf("new VerticalSliceActorRebase(game)");
+const floorTwoIndex = mainSource.indexOf("new FloorTwoArrivalDirector(game)");
+const contractIndex = mainSource.indexOf("new FrontierContractDirector(game)");
+const traversalIndex = mainSource.indexOf("new VerticalSliceTraversalGuard(game)");
+const performanceIndex = mainSource.indexOf("new PerformanceDirector(engine, game.world, renderer)");
+const feelIndex = mainSource.indexOf("new CombatFeelDirector(game, engine)");
+const presentationIndex = mainSource.indexOf("new CombatPresentationDirector(game)");
+const routeAudioIndex = mainSource.indexOf("new RouteAudioDirector(game)");
+const bridgeIndex = mainSource.indexOf("new PlaytestBridge(game, renderer)");
+if (
+  guardIndex < 0
+  || recoveryIndex < 0
+  || sliceIndex <= recoveryIndex
+  || actorRebaseIndex <= sliceIndex
+  || floorTwoIndex <= actorRebaseIndex
+  || contractIndex <= floorTwoIndex
+  || traversalIndex <= contractIndex
+  || performanceIndex <= traversalIndex
+  || feelIndex <= performanceIndex
+  || presentationIndex <= feelIndex
+  || routeAudioIndex <= presentationIndex
+  || bridgeIndex <= routeAudioIndex
+) {
+  throw new Error("Vertical slice, traversal, combat, audio, and playtest initialization order is invalid.");
+}
+
+const workflow = await readFile(".github/workflows/quality.yml", "utf8");
+for (const requiredWorkflowRule of [
+  "@playwright/test@1.55.0",
+  "playwright install --with-deps chromium",
+  "npm run test:browser",
+  "project-ascension-browser-playtest"
+]) {
+  if (!workflow.includes(requiredWorkflowRule)) {
+    throw new Error(`Permanent browser gate is missing workflow rule: ${requiredWorkflowRule}`);
+  }
+}
+
+const browserTest = await readFile("tests/browser/vertical-slice.spec.mts", "utf8");
+for (const requiredBrowserRule of [
+  'bridgeCall(page, "keyDown", "KeyW")',
+  'simulate(page, 1.85, ["KeyW"])',
+  'simulate(page, 0.08, ["Space"])',
+  'simulate(page, 0.08, ["KeyQ"])',
+  'simulate(page, 0.05, ["KeyV"])',
+  'expect(heldInput.activeKeys).toContain("KeyW")',
+  'bridgeCall<GeometryAudit>(page, "geometryAudit")',
+  '"foundry-core"',
+  '"pillar-lift"',
+  "await capture(page, testInfo, view)",
+  "expect(runtimeErrors).toEqual([])",
+  "expect(consoleErrors).toEqual([])"
+]) {
+  if (!browserTest.includes(requiredBrowserRule)) {
+    throw new Error(`Permanent browser gate is missing assertion: ${requiredBrowserRule}`);
+  }
+}
 
 const manifest = JSON.parse(await readFile("public/assets/asset-manifest.json", "utf8"));
 if (!Array.isArray(manifest.assets) || manifest.assets.length < 3) {
@@ -156,4 +261,4 @@ for (const asset of manifest.assets) {
   }
 }
 
-console.log("Project Ascension production and performance smoke checks passed.");
+console.log("Project Ascension permanent browser gate and vertical-slice checks passed.");
