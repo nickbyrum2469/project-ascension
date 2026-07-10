@@ -17,6 +17,7 @@ interface StaggerPulse {
 interface TrailPair {
   mesh: any;
   emitter: any;
+  running: boolean;
 }
 
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
@@ -28,6 +29,9 @@ export class CombatFeelDirector {
   private readonly camera: any;
   private readonly damageLayer: HTMLDivElement;
   private readonly comboElement: HTMLDivElement;
+  private readonly comboCount: HTMLElement;
+  private readonly comboText: HTMLElement;
+  private readonly comboBar: HTMLElement;
   private readonly flashElement: HTMLDivElement;
   private readonly healthSnapshot = new Map<any, number>();
   private readonly labels: DamageLabel[] = [];
@@ -37,11 +41,10 @@ export class CombatFeelDirector {
   private hitStop = 0;
   private impactPunch = 0;
   private combo = 0;
+  private displayedCombo = -1;
   private comboTimer = 0;
   private comboDuration = 2.35;
   private lastStamina = 100;
-  private previousAttack: string | null = null;
-  private trailWasActive = false;
 
   constructor(private readonly game: any, private readonly engine: any) {
     this.scene = game.world.scene;
@@ -55,6 +58,10 @@ export class CombatFeelDirector {
     this.damageLayer.className = "combat-damage-layer";
     this.comboElement = document.createElement("div");
     this.comboElement.className = "combat-combo";
+    this.comboElement.innerHTML = "<small>RIFTGLASS FLOW</small><strong>0</strong><span>confirmed strike</span><i></i>";
+    this.comboCount = this.requiredElement<HTMLElement>(this.comboElement, "strong");
+    this.comboText = this.requiredElement<HTMLElement>(this.comboElement, "span");
+    this.comboBar = this.requiredElement<HTMLElement>(this.comboElement, "i");
     this.flashElement = document.createElement("div");
     this.flashElement.className = "combat-impact-flash";
     document.body.append(this.damageLayer, this.comboElement, this.flashElement);
@@ -64,6 +71,12 @@ export class CombatFeelDirector {
     this.createSwordTrails();
     this.installHitStopWrapper();
     this.scene.onBeforeRenderObservable.add(() => this.update());
+  }
+
+  private requiredElement<T extends HTMLElement>(root: ParentNode, selector: string): T {
+    const element = root.querySelector<T>(selector);
+    if (!element) throw new Error(`Missing combat UI element ${selector}`);
+    return element;
   }
 
   private installHitStopWrapper(): void {
@@ -96,11 +109,11 @@ export class CombatFeelDirector {
       emitter.isPickable = false;
       emitter.parent = parent;
       emitter.position = new BABYLON.Vector3(0, y, 0);
-      const trail = new BABYLON.TrailMesh(name, emitter, this.scene, 0.11, 22, true);
+      const trail = new BABYLON.TrailMesh(name, emitter, this.scene, 0.11, 22, false);
       trail.material = material;
       trail.isPickable = false;
       trail.visibility = 0;
-      this.trails.push({ mesh: trail, emitter });
+      this.trails.push({ mesh: trail, emitter, running: false });
     };
 
     create("warden-third-person-trail", this.player.visual?.sword, 2.05);
@@ -204,15 +217,21 @@ export class CombatFeelDirector {
     const active = attack !== null
       && progress >= (attack === "heavy" ? 0.24 : 0.18)
       && progress <= (attack === "heavy" ? 0.74 : 0.7);
-    const attackChanged = attack !== this.previousAttack;
 
     this.trails.forEach((trail, index) => {
       const correctView = index === 0 ? this.player.cameraMode === "third" : this.player.cameraMode === "first";
-      trail.mesh.visibility = active && correctView ? (attack === "heavy" ? 0.82 : 0.62) : 0;
-      if ((attackChanged || (!active && this.trailWasActive)) && trail.mesh.reset) trail.mesh.reset();
+      const shouldRun = active && correctView;
+      if (shouldRun && !trail.running) {
+        trail.mesh.reset?.();
+        trail.mesh.start?.();
+        trail.running = true;
+      } else if (!shouldRun && trail.running) {
+        trail.mesh.stop?.();
+        trail.mesh.reset?.();
+        trail.running = false;
+      }
+      trail.mesh.visibility = shouldRun ? (attack === "heavy" ? 0.82 : 0.62) : 0;
     });
-    this.previousAttack = attack;
-    this.trailWasActive = active;
   }
 
   private spawnDamageLabel(position: any, damage: number, heavy: boolean): void {
@@ -264,10 +283,16 @@ export class CombatFeelDirector {
     if (this.comboTimer > 0) {
       this.comboTimer = Math.max(0, this.comboTimer - delta);
       this.comboElement.classList.add("visible");
-      this.comboElement.innerHTML = `<small>RIFTGLASS FLOW</small><strong>${this.combo}</strong><span>${this.combo === 1 ? "confirmed strike" : "linked strikes"}</span><i style="transform:scaleX(${clamp01(this.comboTimer / this.comboDuration)})"></i>`;
+      if (this.displayedCombo !== this.combo) {
+        this.displayedCombo = this.combo;
+        this.comboCount.textContent = `${this.combo}`;
+        this.comboText.textContent = this.combo === 1 ? "confirmed strike" : "linked strikes";
+      }
+      this.comboBar.style.transform = `scaleX(${clamp01(this.comboTimer / this.comboDuration)})`;
       return;
     }
     this.combo = 0;
+    this.displayedCombo = -1;
     this.comboElement.classList.remove("visible");
   }
 
