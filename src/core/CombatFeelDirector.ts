@@ -38,8 +38,10 @@ export class CombatFeelDirector {
   private impactPunch = 0;
   private combo = 0;
   private comboTimer = 0;
+  private comboDuration = 2.35;
   private lastStamina = 100;
   private previousAttack: string | null = null;
+  private trailWasActive = false;
 
   constructor(private readonly game: any, private readonly engine: any) {
     this.scene = game.world.scene;
@@ -146,7 +148,8 @@ export class CombatFeelDirector {
     this.hitStop = Math.max(this.hitStop, heavy ? 0.078 : 0.044);
     this.impactPunch = Math.max(this.impactPunch, heavy ? 0.54 : 0.28);
     this.combo += 1;
-    this.comboTimer = heavy ? 2.8 : 2.35;
+    this.comboDuration = heavy ? 2.8 : 2.35;
+    this.comboTimer = this.comboDuration;
     this.spawnDamageLabel(enemy.root.position.add(new BABYLON.Vector3(0, heavy ? 1.65 : 1.3, 0)), damage, heavy);
     this.startStagger(enemy, heavy);
 
@@ -198,14 +201,18 @@ export class CombatFeelDirector {
     const attack = this.player.attack as string | null;
     const duration = attack === "heavy" ? 1.02 : 0.62;
     const progress = attack ? clamp01(Number(this.player.attackTime ?? 0) / duration) : 0;
-    const active = attack !== null && progress >= (attack === "heavy" ? 0.24 : 0.18) && progress <= (attack === "heavy" ? 0.74 : 0.7);
+    const active = attack !== null
+      && progress >= (attack === "heavy" ? 0.24 : 0.18)
+      && progress <= (attack === "heavy" ? 0.74 : 0.7);
+    const attackChanged = attack !== this.previousAttack;
 
     this.trails.forEach((trail, index) => {
       const correctView = index === 0 ? this.player.cameraMode === "third" : this.player.cameraMode === "first";
       trail.mesh.visibility = active && correctView ? (attack === "heavy" ? 0.82 : 0.62) : 0;
-      if ((!active || attack !== this.previousAttack) && trail.mesh.reset) trail.mesh.reset();
+      if ((attackChanged || (!active && this.trailWasActive)) && trail.mesh.reset) trail.mesh.reset();
     });
     this.previousAttack = attack;
+    this.trailWasActive = active;
   }
 
   private spawnDamageLabel(position: any, damage: number, heavy: boolean): void {
@@ -224,6 +231,9 @@ export class CombatFeelDirector {
   private updateDamageLabels(delta: number): void {
     const width = this.engine.getRenderWidth();
     const height = this.engine.getRenderHeight();
+    const canvas = this.engine.getRenderingCanvas?.() as HTMLCanvasElement | null;
+    const cssScaleX = Number(canvas?.clientWidth ?? width) / Math.max(1, width);
+    const cssScaleY = Number(canvas?.clientHeight ?? height) / Math.max(1, height);
     const viewport = this.camera.viewport.toGlobal(width, height);
     const transform = this.scene.getTransformMatrix();
 
@@ -239,8 +249,8 @@ export class CombatFeelDirector {
       );
       const visible = projected.z > 0 && projected.z < 1;
       label.element.style.display = visible ? "block" : "none";
-      label.element.style.left = `${projected.x}px`;
-      label.element.style.top = `${projected.y - progress * 38}px`;
+      label.element.style.left = `${projected.x * cssScaleX}px`;
+      label.element.style.top = `${projected.y * cssScaleY - progress * 38}px`;
       label.element.style.opacity = `${1 - progress}`;
       label.element.style.transform = `translate(-50%, -50%) scale(${1 + Math.sin(progress * Math.PI) * 0.24})`;
       if (progress >= 1) {
@@ -254,7 +264,7 @@ export class CombatFeelDirector {
     if (this.comboTimer > 0) {
       this.comboTimer = Math.max(0, this.comboTimer - delta);
       this.comboElement.classList.add("visible");
-      this.comboElement.innerHTML = `<small>RIFTGLASS FLOW</small><strong>${this.combo}</strong><span>${this.combo === 1 ? "confirmed strike" : "linked strikes"}</span><i style="transform:scaleX(${clamp01(this.comboTimer / 2.35)})"></i>`;
+      this.comboElement.innerHTML = `<small>RIFTGLASS FLOW</small><strong>${this.combo}</strong><span>${this.combo === 1 ? "confirmed strike" : "linked strikes"}</span><i style="transform:scaleX(${clamp01(this.comboTimer / this.comboDuration)})"></i>`;
       return;
     }
     this.combo = 0;
