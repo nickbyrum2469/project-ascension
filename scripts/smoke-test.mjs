@@ -8,7 +8,10 @@ const requiredFiles = [
   "src/core/PlaytestBridge.ts",
   "src/core/VerticalSliceDirector.ts",
   "src/core/VerticalSliceRuntimeGuard.ts",
+  "src/core/VerticalSliceActorRebase.ts",
+  "src/core/VerticalSliceTraversalGuard.ts",
   "src/core/CombatPresentationDirector.ts",
+  "src/audio/RouteAudioDirector.ts",
   "src/combat-presentation.css",
   "src/game/Game.ts",
   "src/game/Player.ts",
@@ -43,7 +46,10 @@ const sourceFiles = await Promise.all([
   "src/core/PlaytestBridge.ts",
   "src/core/VerticalSliceDirector.ts",
   "src/core/VerticalSliceRuntimeGuard.ts",
+  "src/core/VerticalSliceActorRebase.ts",
+  "src/core/VerticalSliceTraversalGuard.ts",
   "src/core/CombatPresentationDirector.ts",
+  "src/audio/RouteAudioDirector.ts",
   "src/game/Game.ts",
   "src/game/Player.ts",
   "src/game/QuestSystem.ts",
@@ -146,10 +152,16 @@ for (const requiredFeature of [
   "vertical-slice-core-to-pillar-catwalk",
   "vertical-slice-pillar-shell",
   "__routedensityguardinstalled",
+  "new verticalsliceactorrebase",
+  "dynamicactorsrebased",
+  "new verticalslicetraversalguard",
+  "protectedroutecollisionvolumesremoved",
   "new combatpresentationdirector",
   "combat-stance-indicator",
   "combat-impact-burst",
-  "regionat(position.x, position.y, position.z)"
+  "regionat(position.x, position.y, position.z)",
+  "new routeaudiodirector",
+  "foundrygain"
 ]) {
   if (!productionSource.includes(requiredFeature)) {
     throw new Error(`Missing required production feature: ${requiredFeature}`);
@@ -179,22 +191,30 @@ if (mainSource.includes("new BABYLON.Engine(canvas, true")) {
 const recoveryIndex = mainSource.indexOf("new VisualRecoveryDirector(game)");
 const guardIndex = mainSource.indexOf("installVerticalSliceRuntimeGuard(VerticalSliceDirector)");
 const sliceIndex = mainSource.indexOf("new VerticalSliceDirector(game)");
+const actorRebaseIndex = mainSource.indexOf("new VerticalSliceActorRebase(game)");
 const floorTwoIndex = mainSource.indexOf("new FloorTwoArrivalDirector(game)");
+const contractIndex = mainSource.indexOf("new FrontierContractDirector(game)");
+const traversalIndex = mainSource.indexOf("new VerticalSliceTraversalGuard(game)");
 const performanceIndex = mainSource.indexOf("new PerformanceDirector(engine, game.world, renderer)");
 const feelIndex = mainSource.indexOf("new CombatFeelDirector(game, engine)");
 const presentationIndex = mainSource.indexOf("new CombatPresentationDirector(game)");
+const routeAudioIndex = mainSource.indexOf("new RouteAudioDirector(game)");
 const bridgeIndex = mainSource.indexOf("new PlaytestBridge(game, renderer)");
 if (
   guardIndex < 0
   || recoveryIndex < 0
   || sliceIndex <= recoveryIndex
-  || floorTwoIndex <= sliceIndex
-  || performanceIndex <= floorTwoIndex
+  || actorRebaseIndex <= sliceIndex
+  || floorTwoIndex <= actorRebaseIndex
+  || contractIndex <= floorTwoIndex
+  || traversalIndex <= contractIndex
+  || performanceIndex <= traversalIndex
   || feelIndex <= performanceIndex
   || presentationIndex <= feelIndex
-  || bridgeIndex <= presentationIndex
+  || routeAudioIndex <= presentationIndex
+  || bridgeIndex <= routeAudioIndex
 ) {
-  throw new Error("Vertical slice, combat presentation, and playtest bridge initialization order is invalid.");
+  throw new Error("Vertical slice, traversal, combat, audio, and playtest initialization order is invalid.");
 }
 
 const workflow = await readFile(".github/workflows/quality.yml", "utf8");
