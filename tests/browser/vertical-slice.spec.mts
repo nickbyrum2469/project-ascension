@@ -98,7 +98,13 @@ test("production vertical slice remains traversable and visually auditable", asy
   expect(landed.grounded).toBe(true);
   expect(Math.abs(landed.y - landed.ground)).toBeLessThan(0.08);
 
-  const staminaBeforeHeavy = landed.stamina;
+  await bridgeCall(page, "checkpoint", "frontier-combat");
+  await simulate(page, 0.35);
+  const combatReady = await bridgeCall<Snapshot>(page, "snapshot");
+  expect(combatReady.cameraMode).toBe("third");
+  expect(combatReady.grounded).toBe(true);
+
+  const staminaBeforeHeavy = combatReady.stamina;
   const heavy = await simulate(page, 0.08, ["KeyQ"]);
   expect(heavy.stamina).toBeLessThan(staminaBeforeHeavy - 20);
   expect(heavy.attack).toBe("heavy");
@@ -108,6 +114,7 @@ test("production vertical slice remains traversable and visually auditable", asy
 
   const firstPerson = await simulate(page, 0.05, ["KeyV"]);
   expect(firstPerson.cameraMode).toBe("first");
+  await simulate(page, 0.25);
   const firstPersonHeavy = await simulate(page, 0.08, ["KeyQ"]);
   expect(firstPersonHeavy.attack).toBe("heavy");
   await capture(page, testInfo, "combat-first-person-heavy");
@@ -139,6 +146,7 @@ test("production vertical slice remains traversable and visually auditable", asy
   ];
   for (const view of views) {
     await bridgeCall(page, "checkpoint", view);
+    await simulate(page, 0.2);
     await capture(page, testInfo, view);
   }
 
@@ -150,6 +158,7 @@ test("production vertical slice remains traversable and visually auditable", asy
 
   for (const view of ["foundry-entry", "foundry-core", "pillar-lift"]) {
     await bridgeCall(page, "checkpoint", view);
+    await simulate(page, 0.2);
     await capture(page, testInfo, view);
   }
 
