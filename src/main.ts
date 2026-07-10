@@ -1,5 +1,7 @@
 import "./styles.css";
-import { Game } from "./game/Game.js";
+import * as BabylonModule from "babylonjs";
+
+(globalThis as typeof globalThis & { BABYLON: typeof BabylonModule }).BABYLON = BabylonModule;
 
 const getCanvas = (): HTMLCanvasElement => {
   const canvas = document.getElementById("render-canvas");
@@ -40,6 +42,7 @@ const boot = async (): Promise<void> => {
   const status = document.getElementById("boot-status");
   try {
     status && (status.textContent = "Synchronizing the Foundation lattice…");
+    const { Game } = await import("./game/Game.js");
     const { engine, renderer } = await createEngine(canvas);
     const game = new Game(engine, canvas, renderer);
     game.run();
