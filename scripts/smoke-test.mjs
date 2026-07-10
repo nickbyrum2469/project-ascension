@@ -216,8 +216,9 @@ for (const requiredBrowserRule of [
   'page.keyboard.press("KeyQ")',
   'page.keyboard.press("KeyV")',
   'bridgeCall<GeometryAudit>(page, "geometryAudit")',
-  'capture(page, testInfo, "foundry-core")',
-  'capture(page, testInfo, "pillar-lift")',
+  '"foundry-core"',
+  '"pillar-lift"',
+  "await capture(page, testInfo, view)",
   "expect(runtimeErrors).toEqual([])",
   "expect(consoleErrors).toEqual([])"
 ]) {
