@@ -10,6 +10,7 @@ const requiredFiles = [
   "src/core/VerticalSliceRuntimeGuard.ts",
   "src/core/VerticalSliceActorRebase.ts",
   "src/core/VerticalSliceTraversalGuard.ts",
+  "src/core/CaelusPhaseZeroDirector.ts",
   "src/core/CombatPresentationDirector.ts",
   "src/audio/RouteAudioDirector.ts",
   "src/combat-presentation.css",
@@ -48,6 +49,7 @@ const sourceFiles = await Promise.all([
   "src/core/VerticalSliceRuntimeGuard.ts",
   "src/core/VerticalSliceActorRebase.ts",
   "src/core/VerticalSliceTraversalGuard.ts",
+  "src/core/CaelusPhaseZeroDirector.ts",
   "src/core/CombatPresentationDirector.ts",
   "src/audio/RouteAudioDirector.ts",
   "src/game/Game.ts",
@@ -158,6 +160,11 @@ for (const requiredFeature of [
   "dynamicactorsrebased",
   "new verticalslicetraversalguard",
   "protectedroutecollisionvolumesremoved",
+  "new caelusphasezerodirector",
+  "caelusphasezeroversion: 1",
+  "caelus-third-person-sword-mount",
+  "legacycaeluscollisionvolumesremoved",
+  "transparentarchitecturematerials",
   "new combatpresentationdirector",
   "combat-stance-indicator",
   "combat-impact-burst",
@@ -193,6 +200,7 @@ if (mainSource.includes("new BABYLON.Engine(canvas, true")) {
 const recoveryIndex = mainSource.indexOf("new VisualRecoveryDirector(game)");
 const guardIndex = mainSource.indexOf("installVerticalSliceRuntimeGuard(VerticalSliceDirector)");
 const sliceIndex = mainSource.indexOf("new VerticalSliceDirector(game)");
+const phaseZeroIndex = mainSource.indexOf("new CaelusPhaseZeroDirector(game)");
 const actorRebaseIndex = mainSource.indexOf("new VerticalSliceActorRebase(game)");
 const floorTwoIndex = mainSource.indexOf("new FloorTwoArrivalDirector(game)");
 const contractIndex = mainSource.indexOf("new FrontierContractDirector(game)");
@@ -206,7 +214,8 @@ if (
   guardIndex < 0
   || recoveryIndex < 0
   || sliceIndex <= recoveryIndex
-  || actorRebaseIndex <= sliceIndex
+  || phaseZeroIndex <= sliceIndex
+  || actorRebaseIndex <= phaseZeroIndex
   || floorTwoIndex <= actorRebaseIndex
   || contractIndex <= floorTwoIndex
   || traversalIndex <= contractIndex
@@ -216,7 +225,7 @@ if (
   || routeAudioIndex <= presentationIndex
   || bridgeIndex <= routeAudioIndex
 ) {
-  throw new Error("Vertical slice, traversal, combat, audio, and playtest initialization order is invalid.");
+  throw new Error("Vertical slice, Caelus recovery, traversal, combat, audio, and playtest initialization order is invalid.");
 }
 
 const workflow = await readFile(".github/workflows/quality.yml", "utf8");
@@ -240,6 +249,9 @@ for (const requiredBrowserRule of [
   'simulate(page, 0.05, ["KeyV"])',
   'expect(heldInput.activeKeys).toContain("KeyW")',
   'bridgeCall<GeometryAudit>(page, "geometryAudit")',
+  '"weapon-idle-right-profile"',
+  'audit.legacyCaelusMeshesEnabled',
+  'audit.transparentArchitectureMaterials',
   '"foundry-core"',
   '"pillar-lift"',
   "await capture(page, testInfo, view)",
@@ -261,4 +273,4 @@ for (const asset of manifest.assets) {
   }
 }
 
-console.log("Project Ascension permanent browser gate and vertical-slice checks passed.");
+console.log("Project Ascension Caelus phase zero and permanent browser gate checks passed.");
