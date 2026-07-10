@@ -1,0 +1,78 @@
+{
+  "pack": "Project Ascension — Verdant Foundation v1",
+  "version": 1,
+  "assets": [
+    {
+      "id": "windscar-ambience",
+      "category": "ambience",
+      "prompt": "Seamless looping fantasy frontier ambience inside an enormous artificial world: steady high grass wind, distant resonant metal groans from colossal support pillars, faint birds, soft leaf movement, rare low sub-bass machinery pulses, spacious and immersive, no music, no voices, no sudden loud events",
+      "durationSeconds": 24,
+      "loop": true,
+      "promptInfluence": 0.55,
+      "volume": 0.42
+    },
+    {
+      "id": "caelus-reach-ambience",
+      "category": "ambience",
+      "prompt": "Seamless looping ambience for a fortified low-poly fantasy city: distant market activity, soft footsteps on stone, flags and awnings moving in wind, quiet forge hammer far away, subtle wooden signs creaking, safe inhabited atmosphere, no intelligible speech, no music",
+      "durationSeconds": 24,
+      "loop": true,
+      "promptInfluence": 0.52,
+      "volume": 0.4
+    },
+    {
+      "id": "sword-light-swing",
+      "category": "combat",
+      "prompt": "Clean fast fantasy longsword swing, sharp controlled steel whoosh with a faint crystalline cyan energy trail, close perspective, punchy game sound effect, dry, no impact, no voice",
+      "durationSeconds": 1.1,
+      "loop": false,
+      "promptInfluence": 0.7,
+      "volume": 0.8
+    },
+    {
+      "id": "sword-heavy-swing",
+      "category": "combat",
+      "prompt": "Powerful two-handed fantasy longsword heavy swing, deep accelerating air displacement, metallic blade resonance and restrained crystalline energy wake, weighty but not explosive, close game sound effect, no impact, no voice",
+      "durationSeconds": 1.5,
+      "loop": false,
+      "promptInfluence": 0.7,
+      "volume": 0.86
+    },
+    {
+      "id": "riftglass-impact",
+      "category": "combat",
+      "prompt": "Fantasy sword striking armored hide and stone-like carapace, dense metallic thud, short crack of glassy cyan magic, small debris detail, satisfying action RPG impact, no gore, no voice",
+      "durationSeconds": 1.2,
+      "loop": false,
+      "promptInfluence": 0.68,
+      "volume": 0.9
+    },
+    {
+      "id": "guard-clash",
+      "category": "combat",
+      "prompt": "Defensive longsword guard blocks a charging creature, hard steel clash, brief low body impact, bright ringing resonance and tiny magical spark, compact action RPG sound, no voice",
+      "durationSeconds": 1.1,
+      "loop": false,
+      "promptInfluence": 0.7,
+      "volume": 0.88
+    },
+    {
+      "id": "rift-boar-charge",
+      "category": "creature",
+      "prompt": "Large corrupted fantasy boar telegraphing a charge: low threatening snort, hoof scrape on stone and soil, rising chest growl with faint crystalline resonance, readable enemy warning cue, no human voice",
+      "durationSeconds": 2.0,
+      "loop": false,
+      "promptInfluence": 0.62,
+      "volume": 0.82
+    },
+    {
+      "id": "quest-thread-stinger",
+      "category": "ui",
+      "prompt": "Short premium fantasy action RPG quest discovery stinger, four ascending crystalline tones, restrained low mechanical resonance underneath, elegant and mysterious, no orchestra swell, no voice",
+      "durationSeconds": 2.6,
+      "loop": false,
+      "promptInfluence": 0.66,
+      "volume": 0.68
+    }
+  ]
+}
