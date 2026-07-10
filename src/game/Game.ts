@@ -53,6 +53,7 @@ export class Game {
   private lastFrame = performance.now();
   private elapsed = 0;
   private ambienceRegion: AmbienceRegion = "windscar";
+  private ascentCinematicTime = 0;
 
   constructor(
     private readonly engine: any,
@@ -119,6 +120,7 @@ export class Game {
         && !this.paused
         && !this.hud.isDialogueOpen()
         && !this.expedition.isLiftActive()
+        && this.ascentCinematicTime <= 0
       ) {
         this.input.requestPointerLock();
       }
@@ -136,7 +138,8 @@ export class Game {
     const controlsEnabled = this.started
       && !this.paused
       && !this.hud.isDialogueOpen()
-      && !liftLocked;
+      && !liftLocked
+      && this.ascentCinematicTime <= 0;
     this.player.update(delta, sampled, this.enemies, controlsEnabled);
 
     if (controlsEnabled) {
@@ -146,7 +149,7 @@ export class Game {
       this.hud.setInteraction(null);
     }
 
-    if (this.expedition.updateLift(delta, this.player.root)) {
+    if (!this.paused && this.expedition.updateLift(delta, this.player.root)) {
       this.quests.completeAscent();
       this.expedition.setProgress(
         this.quests.save.expedition,
@@ -154,7 +157,16 @@ export class Game {
       );
       this.spawnImpact(this.player.position().add(new BABYLON.Vector3(0, 1.5, 0)), true);
       this.spawnImpact(this.player.position().add(new BABYLON.Vector3(0, 4.5, -4)), true);
-      this.input.requestPointerLock();
+      this.ascentCinematicTime = 3.4;
+      this.hud.notify(
+        "FLOOR TWO THRESHOLD",
+        "The seal above is stable but remains closed. Recording the staging route before descent."
+      );
+    }
+
+    if (!this.paused && this.ascentCinematicTime > 0) {
+      this.ascentCinematicTime = Math.max(0, this.ascentCinematicTime - delta);
+      if (this.ascentCinematicTime === 0) this.finishAscentCycle();
     }
 
     this.expedition.update(delta, this.player.position());
@@ -420,6 +432,21 @@ export class Game {
     );
   }
 
+  private finishAscentCycle(): void {
+    const x = this.labyrinth.corePosition.x;
+    const z = this.labyrinth.corePosition.z + 8;
+    const destination = new BABYLON.Vector3(x, this.world.heightAt(x, z), z);
+    this.player.root.position.copyFrom(destination);
+    this.player.lockTarget = null;
+    this.spawnImpact(destination.add(new BABYLON.Vector3(0, 1.25, 0)), true);
+    this.hud.notify(
+      "LIFT CYCLE COMPLETE",
+      "The staging scan is recorded. You have returned safely to the restored Foundry core."
+    );
+    this.canvas.focus();
+    this.input.requestPointerLock();
+  }
+
   private useFoundryShortcut(): void {
     const destination = new BABYLON.Vector3(0, this.world.heightAt(0, -18), -18);
     this.player.root.position.copyFrom(destination);
@@ -470,7 +497,13 @@ export class Game {
 
   private closeDialogue(): void {
     this.hud.hideDialogue();
-    if (!this.paused && !this.expedition.isLiftActive()) this.input.requestPointerLock();
+    if (
+      !this.paused
+      && !this.expedition.isLiftActive()
+      && this.ascentCinematicTime <= 0
+    ) {
+      this.input.requestPointerLock();
+    }
   }
 
   private setPaused(paused: boolean): void {
@@ -482,7 +515,9 @@ export class Game {
       this.audio.uiConfirm();
     } else {
       this.canvas.focus();
-      if (!this.expedition.isLiftActive()) this.input.requestPointerLock();
+      if (!this.expedition.isLiftActive() && this.ascentCinematicTime <= 0) {
+        this.input.requestPointerLock();
+      }
       this.audio.uiConfirm();
     }
   }
