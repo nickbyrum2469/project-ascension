@@ -58,6 +58,18 @@ const installAirborneCollisionGuard = async (): Promise<void> => {
   prototype.__airborneCollisionGuard = true;
 };
 
+const installInterfacePauseGuard = (GameClass: any): void => {
+  const prototype = GameClass.prototype as any;
+  if (prototype.__interfacePauseGuard) return;
+  const update = prototype.update;
+  prototype.update = function pauseBehindArchiveInterfaces(this: any, delta: number): void {
+    const interfaceOpen = document.querySelector(".journal-shell.open, .loadout-overlay.open") !== null;
+    if (interfaceOpen) return;
+    update.call(this, delta);
+  };
+  prototype.__interfacePauseGuard = true;
+};
+
 const boot = async (): Promise<void> => {
   const canvas = getCanvas();
   const status = document.getElementById("boot-status");
@@ -65,6 +77,7 @@ const boot = async (): Promise<void> => {
     status && (status.textContent = "Synchronizing the Foundation lattice…");
     await installAirborneCollisionGuard();
     const { Game } = await import("./game/Game.js");
+    installInterfacePauseGuard(Game);
     const { engine, renderer } = await createEngine(canvas);
     const game = new Game(engine, canvas, renderer);
     new ExpeditionJournal();
