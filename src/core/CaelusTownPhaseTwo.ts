@@ -148,6 +148,9 @@ const createOffsetBand = (
   path: TownPoint[],
   offset: number,
   halfWidth: number,
+  heightOffset: number,
+  surfaceVariation: number,
+  purpose: "road-curb" | "drainage-channel",
   material: any
 ): any => {
   const positions: number[] = [];
@@ -164,12 +167,12 @@ const createOffsetBand = (
     const normalZ = deltaX / length;
     const centerX = path[index].x + normalX * offset;
     const centerZ = path[index].z + normalZ * offset;
-    const crown = index % 4 === 0 ? 0.018 : 0;
+    const masonryUndulation = Math.sin(index * 2.37) * surfaceVariation;
 
     for (const side of [-1, 1]) {
       const x = centerX + normalX * halfWidth * side;
       const z = centerZ + normalZ * halfWidth * side;
-      positions.push(x, world.heightAt(x, z) + 0.11 + crown, z);
+      positions.push(x, world.heightAt(x, z) + heightOffset + masonryUndulation, z);
     }
   }
 
@@ -191,7 +194,9 @@ const createOffsetBand = (
   mesh.isPickable = false;
   mesh.metadata = {
     phase: 2,
-    purpose: "road-drainage-band"
+    purpose,
+    halfWidth,
+    heightOffset
   };
   mesh.computeWorldMatrix(true);
   mesh.freezeWorldMatrix();
@@ -223,7 +228,8 @@ export class CaelusTownPhaseTwo {
       caelusTownPhaseTwoVersion: 1,
       phaseTwoWellRecovered: wellRecovered,
       phaseTwoDrainageBands: drainageBands,
-      phaseTwoCollisionAudit: collisionAudit
+      phaseTwoCollisionAudit: collisionAudit,
+      phaseTwoRoadVisualRevision: 2
     };
   }
 
@@ -260,8 +266,8 @@ export class CaelusTownPhaseTwo {
   }
 
   private buildRoadDrainageBands(): number {
-    const stone = createMaterial(this.scene, "caelus-phase2-drainage-stone", "#59615c", 0.94, 0.01);
-    const channel = createMaterial(this.scene, "caelus-phase2-drainage-channel", "#303a38", 0.98, 0);
+    const stone = createMaterial(this.scene, "caelus-phase2-drainage-stone", "#3d4743", 0.99, 0);
+    const channel = createMaterial(this.scene, "caelus-phase2-drainage-channel", "#252e2c", 1, 0);
     let count = 0;
 
     for (const definition of ROAD_DEFINITIONS) {
@@ -273,7 +279,10 @@ export class CaelusTownPhaseTwo {
           `caelus-phase2-${definition.id}-curb-${side < 0 ? "left" : "right"}`,
           path,
           definition.edgeOffset * side,
-          0.38,
+          0.24,
+          0.082,
+          0.006,
+          "road-curb",
           stone
         );
         createOffsetBand(
@@ -281,8 +290,11 @@ export class CaelusTownPhaseTwo {
           this.world,
           `caelus-phase2-${definition.id}-channel-${side < 0 ? "left" : "right"}`,
           path,
-          (definition.edgeOffset - 0.7) * side,
-          0.22,
+          (definition.edgeOffset - 0.58) * side,
+          0.15,
+          0.058,
+          0.002,
+          "drainage-channel",
           channel
         );
         count += 2;
@@ -298,8 +310,8 @@ export class CaelusTownPhaseTwo {
     const road = this.scene.getMaterialByName?.("caelus-phase1-road");
     if (road) {
       road.unfreeze?.();
-      road.albedoColor = BABYLON.Color3.FromHexString("#454a43");
-      road.roughness = 0.99;
+      road.albedoColor = BABYLON.Color3.FromHexString("#41463f");
+      road.roughness = 1;
       road.metallic = 0;
       road.alpha = 1;
       road.transparencyMode = 0;
@@ -311,8 +323,9 @@ export class CaelusTownPhaseTwo {
     const roadEdge = this.scene.getMaterialByName?.("caelus-phase1-road-edge");
     if (roadEdge) {
       roadEdge.unfreeze?.();
-      roadEdge.albedoColor = BABYLON.Color3.FromHexString("#696d61");
-      roadEdge.roughness = 0.96;
+      roadEdge.albedoColor = BABYLON.Color3.FromHexString("#4d544c");
+      roadEdge.roughness = 1;
+      roadEdge.metallic = 0;
       roadEdge.alpha = 1;
       roadEdge.transparencyMode = 0;
       roadEdge.forceDepthWrite = true;
