@@ -8,6 +8,13 @@ interface SigilVisual {
   crystal: any;
 }
 
+interface NavigationRect {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+
 export class FoundryLabyrinth {
   public readonly entryPosition: any;
   public readonly corePosition: any;
@@ -16,15 +23,20 @@ export class FoundryLabyrinth {
 
   private readonly sigils: SigilVisual[] = [];
   private readonly coreRings: any[] = [];
+  private readonly navigationRects: NavigationRect[];
   private readonly sealedGate: any;
   private readonly shortcutGate: any;
   private readonly dormantMaterial: any;
   private readonly activeMaterial: any;
   private readonly coreMaterial: any;
+  private readonly originX: number;
+  private readonly originZ: number;
   private elapsed = 0;
 
   constructor(private readonly world: World) {
     const origin = world.labyrinthPosition;
+    this.originX = origin.x;
+    this.originZ = origin.z;
     const baseY = world.heightAt(origin.x, origin.z);
     this.entryPosition = new BABYLON.Vector3(origin.x, baseY, origin.z - 3);
     this.sigilPositions = [
@@ -34,6 +46,14 @@ export class FoundryLabyrinth {
     ];
     this.corePosition = new BABYLON.Vector3(origin.x, world.heightAt(origin.x, origin.z - 88), origin.z - 88);
     this.shortcutPosition = new BABYLON.Vector3(origin.x + 29, world.heightAt(origin.x + 29, origin.z - 78), origin.z - 78);
+    this.navigationRects = [
+      { minX: origin.x - 7.2, maxX: origin.x + 7.2, minZ: origin.z - 103, maxZ: origin.z - 5 },
+      { minX: origin.x - 44, maxX: origin.x - 7, minZ: origin.z - 40, maxZ: origin.z - 22 },
+      { minX: origin.x + 7, maxX: origin.x + 44, minZ: origin.z - 40, maxZ: origin.z - 22 },
+      { minX: origin.x - 15, maxX: origin.x + 15, minZ: origin.z - 73, maxZ: origin.z - 45 },
+      { minX: origin.x - 22, maxX: origin.x + 22, minZ: origin.z - 104, maxZ: origin.z - 72 },
+      { minX: origin.x + 18, maxX: origin.x + 36, minZ: origin.z - 91, maxZ: origin.z - 59 }
+    ];
 
     this.dormantMaterial = createMaterial(world.scene, "foundry-dormant-rune", "#24434b", 0.42, 0.32, "#10262d");
     this.activeMaterial = createMaterial(world.scene, "foundry-active-rune", "#8ff7f1", 0.12, 0.16, "#34e3df");
@@ -61,7 +81,7 @@ export class FoundryLabyrinth {
   }
 
   public setProgress(save: LabyrinthSave): void {
-    this.sealedGate.setEnabled(!save.unlocked);
+    this.sealedGate.setEnabled(!save.entered);
     this.shortcutGate.setEnabled(!save.shortcutOpened);
 
     this.sigils.forEach((sigil, index) => {
@@ -74,6 +94,35 @@ export class FoundryLabyrinth {
     this.coreRings.forEach((ring) => {
       ring.material = save.coreRestored ? this.coreMaterial : this.dormantMaterial;
     });
+  }
+
+  public resolvePlayerPosition(position: any, previous: any, save: LabyrinthSave): void {
+    const inEnvelope = position.x >= this.originX - 48
+      && position.x <= this.originX + 48
+      && position.z <= this.originZ - 4
+      && position.z >= this.originZ - 108;
+    if (!inEnvelope) return;
+
+    if (!save.entered && position.z < this.originZ - 9) {
+      position.x = previous.x;
+      position.z = previous.z;
+      return;
+    }
+
+    const insideWalkableSpace = this.navigationRects.some((rect) => this.isInsideRect(position.x, position.z, rect));
+    if (!insideWalkableSpace) {
+      position.x = previous.x;
+      position.z = previous.z;
+      return;
+    }
+
+    const insideShortcut = position.x > this.originX + 18
+      && position.z < this.originZ - 59
+      && position.z > this.originZ - 91;
+    if (insideShortcut && !save.shortcutOpened) {
+      position.x = previous.x;
+      position.z = previous.z;
+    }
   }
 
   public update(delta: number): void {
@@ -280,5 +329,9 @@ export class FoundryLabyrinth {
       this.world.shadowGenerator.addShadowCaster(bar);
     }
     return gate;
+  }
+
+  private isInsideRect(x: number, z: number, rect: NavigationRect): boolean {
+    return x >= rect.minX && x <= rect.maxX && z >= rect.minZ && z <= rect.maxZ;
   }
 }
