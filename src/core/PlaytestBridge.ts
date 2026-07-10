@@ -11,8 +11,11 @@ const checkpoints: Record<string, PlaytestCheckpoint> = {
   spawn: { x: 0, z: -2, yaw: Math.PI },
   "frontier-combat": { x: 0, z: -60, yaw: Math.PI },
   "gate-exterior": { x: 0, z: 5, yaw: 0 },
+  "gate-interior": { x: 0, z: 34, yaw: 0 },
   "city-boulevard": { x: 0, z: 74, yaw: 0 },
+  "city-market": { x: 0, z: 91, yaw: 0 },
   "city-plaza": { x: 0, z: 112, yaw: 0 },
+  "city-north": { x: 0, z: 176, yaw: Math.PI },
   frontier: { x: -22, z: -156, yaw: Math.PI * 0.9 },
   "foundry-breach": { x: 448, z: -451, yaw: Math.PI * 0.7 },
   "foundry-entry": { x: 475, z: -470, yaw: Math.PI },
@@ -47,13 +50,17 @@ export class PlaytestBridge {
     });
 
     const api = {
-      version: 4,
+      version: 5,
       renderer,
       checkpoints: Object.keys(checkpoints),
       snapshot: () => this.snapshot(),
       checkpoint: (name: string) => this.moveToCheckpoint(name),
       teleport: (x: number, z: number, yaw = Math.PI) => this.teleport(x, z, yaw),
       setView: (mode: CameraMode) => this.setView(mode),
+      setPaused: (paused: boolean) => this.setPaused(paused),
+      cameraPose: (offsetX: number, offsetY: number, offsetZ: number, targetY = 1.2) => (
+        this.cameraPose(offsetX, offsetY, offsetZ, targetY)
+      ),
       keyDown: (code: string) => this.dispatchKey("keydown", code),
       keyUp: (code: string) => this.dispatchKey("keyup", code),
       simulate: (seconds: number, codes: string[] = []) => this.simulate(seconds, codes),
@@ -101,7 +108,10 @@ export class PlaytestBridge {
       expedition: { ...(this.game.quests?.save?.expedition ?? {}) },
       meshCount: this.game.world.scene.meshes.length,
       activeMeshes: this.game.world.scene.getActiveMeshes?.().length ?? 0,
+      fps: Number(this.game.world.engine.getFps?.().toFixed?.(1) ?? 0),
       verticalSliceVersion: this.game.world.scene.metadata?.verticalSliceVersion ?? null,
+      caelusPhaseZeroVersion: this.game.world.scene.metadata?.caelusPhaseZeroVersion ?? null,
+      weaponMountInstalled: Boolean(this.game.world.scene.metadata?.weaponMountInstalled),
       protectedRouteCollisionVolumesRemoved:
         this.game.world.scene.metadata?.protectedRouteCollisionVolumesRemoved ?? 0,
       runtimeErrors: [...this.errors]
@@ -135,6 +145,28 @@ export class PlaytestBridge {
 
   private setView(mode: CameraMode): void {
     this.game.player.setCameraMode(mode, false);
+  }
+
+  private setPaused(paused: boolean): Record<string, unknown> {
+    this.game.paused = paused;
+    this.clearInput();
+    return this.snapshot();
+  }
+
+  private cameraPose(
+    offsetX: number,
+    offsetY: number,
+    offsetZ: number,
+    targetY: number
+  ): Record<string, unknown> {
+    const playerPosition = this.game.player.root.position;
+    this.game.world.camera.position.set(
+      playerPosition.x + offsetX,
+      playerPosition.y + offsetY,
+      playerPosition.z + offsetZ
+    );
+    this.game.world.camera.setTarget(playerPosition.add(new BABYLON.Vector3(0, targetY, 0)));
+    return this.snapshot();
   }
 
   private dispatchKey(type: KeyEventType, code: string): void {
@@ -202,6 +234,53 @@ export class PlaytestBridge {
       "vertical-slice-pillar-shell"
     ];
 
+    const legacyPrefixes = [
+      "caelus-south-wall-left",
+      "caelus-south-wall-right",
+      "caelus-north-wall",
+      "caelus-west-wall",
+      "caelus-east-wall",
+      "caelus-wall-tower-",
+      "caelus-central-plaza",
+      "caelus-expedition-keep"
+    ];
+    const legacyCaelusMeshesEnabled = scene.meshes.filter((mesh: any) => {
+      const name = String(mesh.name ?? "");
+      return legacyPrefixes.some((prefix) => name.startsWith(prefix)) && mesh.isEnabled?.();
+    }).map((mesh: any) => mesh.name);
+    const legacyGate = scene.getTransformNodeByName?.("caelus-gate-root");
+    if (legacyGate?.isEnabled?.()) legacyCaelusMeshesEnabled.push("caelus-gate-root");
+
+    const unsupportedExact = new Set([
+      "vertical-slice-wall-walks",
+      "vertical-slice-wall-merlons",
+      "vertical-slice-pillar-collars",
+      "vertical-slice-pillar-ascent-rune"
+    ]);
+    const unsupportedCityMeshesEnabled = scene.meshes.filter((mesh: any) => {
+      const name = String(mesh.name ?? "");
+      return (
+        unsupportedExact.has(name)
+        || name.startsWith("vertical-slice-monument-ring-")
+      ) && mesh.isEnabled?.();
+    }).map((mesh: any) => mesh.name);
+
+    const architecturePrefixes = [
+      "vertical-slice-city-",
+      "vertical-slice-plaster-",
+      "vertical-slice-roof-",
+      "vertical-slice-timber",
+      "vertical-slice-plaza-",
+      "vertical-slice-gate-",
+      "vertical-slice-market-",
+      "vertical-slice-banner"
+    ];
+    const transparentArchitectureMaterials = scene.materials.filter((material: any) => {
+      const name = String(material.name ?? "");
+      return architecturePrefixes.some((prefix) => name.startsWith(prefix))
+        && (Number(material.alpha ?? 1) < 0.999 || Number(material.transparencyMode ?? 0) !== 0);
+    }).map((material: any) => material.name);
+
     return {
       unsupportedRibs,
       missingRequiredMeshes: requiredMeshes.filter((name) => !scene.getMeshByName?.(name)),
@@ -210,6 +289,14 @@ export class PlaytestBridge {
       terrainBumpTexture: scene.getMaterialByName?.("windscar-ground")?.bumpTexture?.name ?? null,
       collisionBoxes: this.game.world.collisionBoxes?.length ?? 0,
       verticalSliceVersion: scene.metadata?.verticalSliceVersion ?? null,
+      caelusPhaseZeroVersion: scene.metadata?.caelusPhaseZeroVersion ?? null,
+      weaponMountInstalled: Boolean(scene.getTransformNodeByName?.("caelus-third-person-sword-mount")),
+      weaponMountParent: scene.getTransformNodeByName?.("caelus-third-person-sword-mount")?.parent?.name ?? null,
+      legacyCaelusMeshesEnabled,
+      unsupportedCityMeshesEnabled,
+      transparentArchitectureMaterials,
+      legacyCaelusCollisionVolumesRemoved: Number(scene.metadata?.legacyCaelusCollisionVolumesRemoved ?? 0),
+      opaqueArchitectureMaterials: Number(scene.metadata?.opaqueArchitectureMaterials ?? 0),
       dynamicActorsRebased: Boolean(scene.metadata?.dynamicActorsRebased),
       protectedRouteCollisionVolumesRemoved:
         Number(scene.metadata?.protectedRouteCollisionVolumesRemoved ?? 0)
