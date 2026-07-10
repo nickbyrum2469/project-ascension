@@ -35,10 +35,19 @@ export interface QuestSave {
   rewardClaimed: boolean;
 }
 
+export interface LabyrinthSave {
+  unlocked: boolean;
+  entered: boolean;
+  sigilsActivated: boolean[];
+  coreRestored: boolean;
+  shortcutOpened: boolean;
+}
+
 export interface SaveData {
   version: number;
   settings: GameSettings;
   quest: QuestSave;
+  labyrinth: LabyrinthSave;
   player: {
     health: number;
     focus: number;

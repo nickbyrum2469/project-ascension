@@ -2,6 +2,7 @@ import { AudioDirector } from "../audio/AudioDirector.js";
 import { InputManager } from "../core/InputManager.js";
 import type { InputFrame } from "../data/GameTypes.js";
 import { Hud } from "../ui/Hud.js";
+import { FoundryLabyrinth } from "../world/FoundryLabyrinth.js";
 import { World } from "../world/World.js";
 import { Player } from "./Player.js";
 import { QuestSystem } from "./QuestSystem.js";
@@ -40,6 +41,7 @@ export class Game {
   private readonly quests: QuestSystem;
   private readonly player: Player;
   private readonly enemies: RiftBoar[];
+  private readonly labyrinth: FoundryLabyrinth;
   private readonly effects: TransientEffect[] = [];
   private started = false;
   private paused = false;
@@ -54,6 +56,8 @@ export class Game {
     this.input = new InputManager(canvas);
     this.world = new World(engine);
     this.quests = new QuestSystem(this.hud, this.audio);
+    this.labyrinth = new FoundryLabyrinth(this.world);
+    this.labyrinth.setProgress(this.quests.save.labyrinth);
     this.player = new Player(
       this.world,
       this.hud,
@@ -137,6 +141,8 @@ export class Game {
     const maraPosition = this.world.mara.root.position;
     const maraDistance = BABYLON.Vector3.Distance(playerPosition, maraPosition);
     const markerDistance = BABYLON.Vector3.Distance(playerPosition, this.world.markerPosition);
+    const entryDistance = BABYLON.Vector3.Distance(playerPosition, this.labyrinth.entryPosition);
+    const labyrinthSave = this.quests.save.labyrinth;
 
     if (maraDistance <= 3.25) {
       this.hud.setInteraction("Speak with Mara Venn");
@@ -153,12 +159,68 @@ export class Game {
       return;
     }
 
+    if (entryDistance <= 5.2) {
+      if (!labyrinthSave.unlocked) {
+        this.hud.setInteraction("The Foundry breach is sealed");
+      } else if (!labyrinthSave.entered) {
+        this.hud.setInteraction("Open the Foundry Labyrinth");
+        if (input.interactPressed) {
+          this.quests.enterLabyrinth();
+          this.labyrinth.setProgress(this.quests.save.labyrinth);
+          this.spawnImpact(this.labyrinth.entryPosition.add(new BABYLON.Vector3(0, 2.3, 0)), true);
+        }
+      } else {
+        this.hud.setInteraction("Foundry relay chambers ahead");
+      }
+      return;
+    }
+
+    if (labyrinthSave.entered && !labyrinthSave.coreRestored) {
+      for (let index = 0; index < this.labyrinth.sigilPositions.length; index += 1) {
+        const sigilPosition = this.labyrinth.sigilPositions[index];
+        const distance = BABYLON.Vector3.Distance(playerPosition, sigilPosition);
+        if (distance <= 4 && !labyrinthSave.sigilsActivated[index]) {
+          this.hud.setInteraction(`Attune Foundry relay ${index + 1}`);
+          if (input.interactPressed && this.quests.activateSigil(index)) {
+            this.labyrinth.setProgress(this.quests.save.labyrinth);
+            this.spawnImpact(sigilPosition.add(new BABYLON.Vector3(0, 1.4, 0)), false);
+          }
+          return;
+        }
+      }
+
+      const coreDistance = BABYLON.Vector3.Distance(playerPosition, this.labyrinth.corePosition);
+      if (coreDistance <= 5.2) {
+        if (this.quests.canRestoreCore()) {
+          this.hud.setInteraction("Restore the buried pillar core");
+          if (input.interactPressed && this.quests.restoreCore()) {
+            this.labyrinth.setProgress(this.quests.save.labyrinth);
+            this.spawnImpact(this.labyrinth.corePosition.add(new BABYLON.Vector3(0, 3.2, 0)), true);
+            this.spawnImpact(this.labyrinth.corePosition.add(new BABYLON.Vector3(0, 5.2, 0)), true);
+          }
+        } else {
+          this.hud.setInteraction(`Pillar core sealed — ${this.quests.activeSigilCount()}/3 relays active`);
+        }
+        return;
+      }
+    }
+
+    if (labyrinthSave.shortcutOpened) {
+      const shortcutDistance = BABYLON.Vector3.Distance(playerPosition, this.labyrinth.shortcutPosition);
+      if (shortcutDistance <= 4.5) {
+        this.hud.setInteraction("Return to Caelus Reach");
+        if (input.interactPressed) this.useFoundryShortcut();
+        return;
+      }
+    }
+
     this.hud.setInteraction(null);
   }
 
   private openMaraDialogue(): void {
     this.input.releasePointerLock();
     const quest = this.quests.save.quest;
+    const labyrinth = this.quests.save.labyrinth;
     if (!quest.accepted) {
       this.hud.showDialogue(
         "Mara Venn",
@@ -195,6 +257,7 @@ export class Game {
           label: "Record the route and attune the relic.",
           action: () => {
             this.quests.complete();
+            this.labyrinth.setProgress(this.quests.save.labyrinth);
             this.player.visual.rune.material.emissiveIntensity = 1.7;
             this.spawnImpact(this.player.position().add(new BABYLON.Vector3(0, 1.2, 0)), true);
             this.closeDialogue();
@@ -204,12 +267,25 @@ export class Game {
       return;
     }
 
-    if (quest.completed) {
+    if (labyrinth.coreRestored) {
       this.hud.showDialogue(
         "Mara Venn",
         "MV",
-        "The guild has begun charting the underground resonance. This was only the first lock. When the Foundry opens, the whole floor will feel it.",
-        [{ label: "Then we’ll be ready.", action: () => this.closeDialogue() }]
+        "The eastern pillar is carrying power again. We can feel its rhythm through every foundation stone in Caelus Reach. You did more than clear a ruin—you opened the first permanent route toward the floor above.",
+        [{ label: "Then we keep climbing.", action: () => this.closeDialogue() }]
+      );
+      return;
+    }
+
+    if (quest.completed) {
+      const status = labyrinth.entered
+        ? `${this.quests.activeSigilCount()} of the 3 relay sigils are synchronized.`
+        : "The breach is open beneath the eastern support pillar.";
+      this.hud.showDialogue(
+        "Mara Venn",
+        "MV",
+        `The buried Foundry is responding to your Riftglass Edge. ${status} Restore the pillar core and it should create a stable return route to the city.`,
+        [{ label: "I’ll finish the restoration.", action: () => this.closeDialogue() }]
       );
       return;
     }
@@ -222,6 +298,15 @@ export class Game {
       `The road remains unstable. You have confirmed ${hunt} of 3 rift boars. ${marker}`,
       [{ label: "I’ll continue the sweep.", action: () => this.closeDialogue() }]
     );
+  }
+
+  private useFoundryShortcut(): void {
+    const destination = new BABYLON.Vector3(0, this.world.heightAt(0, -18), -18);
+    this.player.root.position.copyFrom(destination);
+    this.player.lockTarget = null;
+    this.audio.setAmbience("caelus");
+    this.spawnImpact(destination.add(new BABYLON.Vector3(0, 1.2, 0)), true);
+    this.hud.notify("FOUNDATION SHORTCUT", "The restored pillar returned you to the Caelus Reach gate.");
   }
 
   private closeDialogue(): void {
@@ -258,6 +343,7 @@ export class Game {
       mesh.scaling.setAll(pulse);
       mesh.rotation.y += delta * (index % 2 ? -0.45 : 0.55);
     });
+    this.labyrinth.update(delta);
   }
 
   private spawnImpact(position: any, heavy: boolean): void {

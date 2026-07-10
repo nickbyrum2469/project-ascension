@@ -6,8 +6,10 @@ const requiredFiles = [
   "src/main.ts",
   "src/game/Game.ts",
   "src/game/Player.ts",
+  "src/game/QuestSystem.ts",
   "src/game/RiftBoar.ts",
   "src/world/World.ts",
+  "src/world/FoundryLabyrinth.ts",
   "src/world/ProceduralAssets.ts",
   "src/ui/Hud.ts",
   "src/audio/AudioDirector.ts",
@@ -27,12 +29,25 @@ const sourceFiles = await Promise.all([
   "src/main.ts",
   "src/game/Game.ts",
   "src/game/Player.ts",
+  "src/game/QuestSystem.ts",
   "src/world/World.ts",
+  "src/world/FoundryLabyrinth.ts",
   "src/ui/Hud.ts"
 ].map((file) => readFile(file, "utf8")));
 const productionSource = sourceFiles.join("\n").toLowerCase();
 for (const banned of ["todo:", "replace later", "temporary asset", "placeholder asset"]) {
   if (productionSource.includes(banned)) throw new Error(`Production source contains banned marker: ${banned}`);
+}
+
+for (const requiredFeature of [
+  "foundrylabyrinth",
+  "sigilsactivated",
+  "restorecore",
+  "shortcutopened"
+]) {
+  if (!productionSource.includes(requiredFeature)) {
+    throw new Error(`Missing required labyrinth progression feature: ${requiredFeature}`);
+  }
 }
 
 const manifest = JSON.parse(await readFile("public/assets/asset-manifest.json", "utf8"));

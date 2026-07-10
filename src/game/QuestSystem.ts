@@ -1,4 +1,4 @@
-import type { GameSettings, QuestSave, SaveData } from "../data/GameTypes.js";
+import type { GameSettings, LabyrinthSave, QuestSave, SaveData } from "../data/GameTypes.js";
 import type { Hud } from "../ui/Hud.js";
 import type { AudioDirector } from "../audio/AudioDirector.js";
 
@@ -10,6 +10,14 @@ const defaultQuest = (): QuestSave => ({
   markerInvestigated: false,
   completed: false,
   rewardClaimed: false
+});
+
+const defaultLabyrinth = (): LabyrinthSave => ({
+  unlocked: false,
+  entered: false,
+  sigilsActivated: [false, false, false],
+  coreRestored: false,
+  shortcutOpened: false
 });
 
 const defaultSettings = (): GameSettings => ({
@@ -29,14 +37,13 @@ export class QuestSystem {
     private readonly audio: AudioDirector
   ) {
     this.save = this.load();
-    this.hud.updateQuest(this.save.quest);
+    this.refreshHud();
   }
 
   public accept(): void {
     if (this.save.quest.accepted) return;
     this.save.quest.accepted = true;
-    this.persist();
-    this.hud.updateQuest(this.save.quest);
+    this.persistAndRefresh();
     this.hud.notify("NEW THREAD", "Echoes Under Stone");
     this.audio.quest();
   }
@@ -44,8 +51,7 @@ export class QuestSystem {
   public recordBoarDefeat(): void {
     if (!this.save.quest.accepted || this.save.quest.completed) return;
     this.save.quest.boarsDefeated = Math.min(3, this.save.quest.boarsDefeated + 1);
-    this.persist();
-    this.hud.updateQuest(this.save.quest);
+    this.persistAndRefresh();
     this.hud.notify("HUNT UPDATED", `${this.save.quest.boarsDefeated} of 3 rift boars defeated`);
     this.audio.quest();
   }
@@ -53,8 +59,7 @@ export class QuestSystem {
   public investigateMarker(): void {
     if (!this.save.quest.accepted || this.save.quest.markerInvestigated) return;
     this.save.quest.markerInvestigated = true;
-    this.persist();
-    this.hud.updateQuest(this.save.quest);
+    this.persistAndRefresh();
     this.hud.notify("CLUE RECORDED", "The aqueduct stone is resonating with machinery below.");
     this.audio.quest();
   }
@@ -70,12 +75,53 @@ export class QuestSystem {
     if (!this.canComplete()) return;
     this.save.quest.completed = true;
     this.save.quest.rewardClaimed = true;
+    this.save.labyrinth.unlocked = true;
     this.save.player.riftglassUnlocked = true;
     this.save.player.focus = Math.max(this.save.player.focus, 35);
-    this.persist();
-    this.hud.updateQuest(this.save.quest);
-    this.hud.notify("RELIC ATTUNED", "Riftglass Edge — attacks now leave a cyan fracture wake.");
+    this.persistAndRefresh();
+    this.hud.notify("FOUNDRY ROUTE UNSEALED", "Riftglass Edge can now open the breach beneath the eastern pillar.");
     this.audio.quest();
+  }
+
+  public enterLabyrinth(): void {
+    if (!this.save.labyrinth.unlocked || this.save.labyrinth.entered) return;
+    this.save.labyrinth.entered = true;
+    this.persistAndRefresh();
+    this.hud.notify("FOUNDRY LABYRINTH", "Three dormant sigils are feeding a sealed pillar core.");
+    this.audio.quest();
+  }
+
+  public activateSigil(index: number): boolean {
+    if (!this.save.labyrinth.unlocked || this.save.labyrinth.coreRestored) return false;
+    if (index < 0 || index >= this.save.labyrinth.sigilsActivated.length) return false;
+    if (this.save.labyrinth.sigilsActivated[index]) return false;
+    this.save.labyrinth.sigilsActivated[index] = true;
+    const activeCount = this.activeSigilCount();
+    this.persistAndRefresh();
+    this.hud.notify("SIGIL ATTUNED", `${activeCount} of 3 Foundry relays are now synchronized.`);
+    this.audio.quest();
+    return true;
+  }
+
+  public activeSigilCount(): number {
+    return this.save.labyrinth.sigilsActivated.filter(Boolean).length;
+  }
+
+  public canRestoreCore(): boolean {
+    return this.save.labyrinth.unlocked
+      && this.activeSigilCount() >= 3
+      && !this.save.labyrinth.coreRestored;
+  }
+
+  public restoreCore(): boolean {
+    if (!this.canRestoreCore()) return false;
+    this.save.labyrinth.coreRestored = true;
+    this.save.labyrinth.shortcutOpened = true;
+    this.save.player.focus = 100;
+    this.persistAndRefresh();
+    this.hud.notify("PILLAR CORE RESTORED", "A permanent return route to Caelus Reach has opened.");
+    this.audio.quest();
+    return true;
   }
 
   public updateSettings(settings: GameSettings): void {
@@ -94,10 +140,16 @@ export class QuestSystem {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return this.defaults();
       const parsed = JSON.parse(raw) as Partial<SaveData>;
+      const parsedSigils = parsed.labyrinth?.sigilsActivated ?? [];
       return {
-        version: 2,
+        version: 3,
         settings: { ...defaultSettings(), ...(parsed.settings ?? {}) },
         quest: { ...defaultQuest(), ...(parsed.quest ?? {}) },
+        labyrinth: {
+          ...defaultLabyrinth(),
+          ...(parsed.labyrinth ?? {}),
+          sigilsActivated: [0, 1, 2].map((index) => parsedSigils[index] ?? false)
+        },
         player: {
           health: parsed.player?.health ?? 100,
           focus: parsed.player?.focus ?? 0,
@@ -111,15 +163,25 @@ export class QuestSystem {
 
   private defaults(): SaveData {
     return {
-      version: 2,
+      version: 3,
       settings: defaultSettings(),
       quest: defaultQuest(),
+      labyrinth: defaultLabyrinth(),
       player: {
         health: 100,
         focus: 0,
         riftglassUnlocked: false
       }
     };
+  }
+
+  private refreshHud(): void {
+    this.hud.updateQuest(this.save.quest, this.save.labyrinth);
+  }
+
+  private persistAndRefresh(): void {
+    this.persist();
+    this.refreshHud();
   }
 
   private persist(): void {

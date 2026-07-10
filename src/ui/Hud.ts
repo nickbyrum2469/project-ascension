@@ -1,4 +1,4 @@
-import type { CameraMode, GameSettings, QuestSave } from "../data/GameTypes.js";
+import type { CameraMode, GameSettings, LabyrinthSave, QuestSave } from "../data/GameTypes.js";
 import type { AudioDirector } from "../audio/AudioDirector.js";
 
 interface DialogueChoice {
@@ -134,7 +134,7 @@ export class Hud {
     this.interactionPrompt.classList.remove("hidden");
   }
 
-  public updateQuest(quest: QuestSave): void {
+  public updateQuest(quest: QuestSave, labyrinth: LabyrinthSave): void {
     this.questObjectives.replaceChildren();
 
     if (!quest.accepted) {
@@ -149,10 +149,23 @@ export class Hud {
       if (quest.boarsDefeated >= 3 && quest.markerInvestigated) {
         this.appendObjective("Return to Mara Venn", false);
       }
+    } else if (!labyrinth.coreRestored) {
+      this.questTitle.textContent = "The Foundry Below";
+      this.questDescription.textContent = labyrinth.entered
+        ? "Synchronize the three relay sigils and restore the buried pillar core."
+        : "Reach the breach beneath the eastern support pillar.";
+      this.appendObjective("Enter the Foundry Labyrinth", labyrinth.entered);
+      labyrinth.sigilsActivated.forEach((active, index) => {
+        this.appendObjective(`Attune relay sigil ${index + 1}`, active);
+      });
+      if (labyrinth.sigilsActivated.every(Boolean)) {
+        this.appendObjective("Restore the pillar core", false);
+      }
     } else {
-      this.questTitle.textContent = "Echoes Under Stone";
-      this.questDescription.textContent = "The first route toward the buried Foundry has been recorded.";
-      this.appendObjective("Riftglass Edge attuned", true);
+      this.questTitle.textContent = "Pillar of Ash and Glass";
+      this.questDescription.textContent = "The Foundry core is stable and the first permanent ascent route is taking shape.";
+      this.appendObjective("Foundry pillar core restored", true);
+      this.appendObjective("Permanent return shortcut opened", labyrinth.shortcutOpened);
     }
 
     this.questCard.classList.remove("updated");
