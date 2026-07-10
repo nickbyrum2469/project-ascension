@@ -7,6 +7,12 @@ interface PhaseTwoCollisionAudit {
 
 interface PlaytestBridgeApi {
   phaseTwoAudit?: () => Record<string, unknown>;
+  phaseTwoCollisionProbe?: (
+    fromX: number,
+    fromZ: number,
+    toX: number,
+    toZ: number
+  ) => Record<string, unknown>;
 }
 
 export class CaelusPhaseTwoPlaytestExtension {
@@ -71,6 +77,36 @@ export class CaelusPhaseTwoPlaytestExtension {
         phaseTwoMaterialCount: scene.materials.filter((material: any) => (
           String(material.name ?? "").startsWith("caelus-phase2-")
         )).length
+      };
+    };
+
+    bridge.phaseTwoCollisionProbe = (
+      fromX: number,
+      fromZ: number,
+      toX: number,
+      toZ: number
+    ): Record<string, unknown> => {
+      const previous = new BABYLON.Vector3(
+        fromX,
+        game.world.heightAt(fromX, fromZ),
+        fromZ
+      );
+      const position = new BABYLON.Vector3(
+        toX,
+        game.world.heightAt(toX, toZ),
+        toZ
+      );
+      game.world.resolvePlayerPosition(position, previous);
+      const blocked = Math.abs(position.x - previous.x) < 0.001
+        && Math.abs(position.z - previous.z) < 0.001;
+      return {
+        fromX,
+        fromZ,
+        requestedX: toX,
+        requestedZ: toZ,
+        resolvedX: Number(position.x.toFixed(3)),
+        resolvedZ: Number(position.z.toFixed(3)),
+        blocked
       };
     };
   }
