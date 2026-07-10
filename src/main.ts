@@ -8,6 +8,7 @@ import { FloorTwoArrivalDirector } from "./core/FloorTwoArrivalDirector.js";
 import { FrontierContractDirector } from "./core/FrontierContractDirector.js";
 import { PerformanceDirector } from "./core/PerformanceDirector.js";
 import { PlaytestBridge } from "./core/PlaytestBridge.js";
+import { VerticalSliceActorRebase } from "./core/VerticalSliceActorRebase.js";
 import { VerticalSliceDirector } from "./core/VerticalSliceDirector.js";
 import { installVerticalSliceRuntimeGuard } from "./core/VerticalSliceRuntimeGuard.js";
 import { VisualRecoveryDirector } from "./core/VisualRecoveryDirector.js";
@@ -182,6 +183,7 @@ const boot = async (): Promise<void> => {
     applyEmergencyGpuBudget(game);
     new VisualRecoveryDirector(game);
     new VerticalSliceDirector(game);
+    new VerticalSliceActorRebase(game);
     const floorTwo = new FloorTwoArrivalDirector(game);
     installFloorTwoSafety(game, floorTwo);
     new FrontierContractDirector(game);
