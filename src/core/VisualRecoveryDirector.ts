@@ -56,8 +56,8 @@ export class VisualRecoveryDirector {
       if (terrain.albedoTexture) terrain.albedoTexture.level = 0.72;
     }
 
-    this.tuneMaterial("frontier-road", "#b79a69", "#342c20", 0.12);
-    this.tuneMaterial("frontier-road-verge", "#68755a", "#1b261b", 0.08);
+    this.tuneMaterial("frontier-road", "#927b56", "#241f17", 0.045);
+    this.tuneMaterial("frontier-road-verge", "#68755a", "#1b261b", 0.06);
     this.tuneMaterial("caelus-wall-stone", "#6f8584", "#182627", 0.08);
     this.tuneMaterial("caelus-wall-shadow", "#40595c", "#10191a", 0.07);
     this.tuneMaterial("caelus-plaster-a", "#aaa88a", "#262419", 0.05);
@@ -67,8 +67,8 @@ export class VisualRecoveryDirector {
     const pipeline = manager?.getPipelineByName?.("foundation-pipeline")
       ?? manager?._renderPipelines?.["foundation-pipeline"];
     if (pipeline?.imageProcessing) {
-      pipeline.imageProcessing.exposure = 1.08;
-      pipeline.imageProcessing.contrast = 1.03;
+      pipeline.imageProcessing.exposure = 1.04;
+      pipeline.imageProcessing.contrast = 1.04;
     }
   }
 
@@ -91,16 +91,24 @@ export class VisualRecoveryDirector {
   }
 
   private correctWeaponMounts(): void {
-    this.wrapWeapon(this.player.visual?.sword, "third-person-sword-direction-fix");
-    this.wrapWeapon(this.player.fpSword, "first-person-sword-direction-fix");
+    this.wrapWeapon(
+      this.player.visual?.sword,
+      "third-person-sword-direction-fix",
+      new BABYLON.Vector3(Math.PI / 2, 0, -0.18)
+    );
+    this.wrapWeapon(
+      this.player.fpSword,
+      "first-person-sword-direction-fix",
+      BABYLON.Vector3.Zero()
+    );
   }
 
-  private wrapWeapon(weapon: any, name: string): void {
+  private wrapWeapon(weapon: any, name: string, correctionRotation: any): void {
     if (!weapon?.parent || weapon.metadata?.directionCorrected) return;
     const correction = new BABYLON.TransformNode(name, this.scene);
     correction.parent = weapon.parent;
     correction.position.copyFrom(weapon.position);
-    correction.rotation = new BABYLON.Vector3(Math.PI, 0, 0);
+    correction.rotation.copyFrom(correctionRotation);
     weapon.parent = correction;
     weapon.position = BABYLON.Vector3.Zero();
     weapon.metadata = { ...(weapon.metadata ?? {}), directionCorrected: true };
@@ -181,19 +189,19 @@ export class VisualRecoveryDirector {
   }
 
   private buildSpawnTrail(): void {
-    const roadStone = createMaterial(this.scene, "spawn-trail-stone", "#ad966c", 0.92, 0.02);
-    roadStone.emissiveColor = BABYLON.Color3.FromHexString("#2c2519");
-    roadStone.emissiveIntensity = 0.12;
+    const roadStone = createMaterial(this.scene, "spawn-trail-stone", "#756449", 0.94, 0.01);
+    roadStone.emissiveColor = BABYLON.Color3.FromHexString("#19150f");
+    roadStone.emissiveIntensity = 0.025;
     const verge = createMaterial(this.scene, "spawn-trail-verge", "#789064", 0.94, 0.01);
-    verge.emissiveColor = BABYLON.Color3.FromHexString("#1c2918");
-    verge.emissiveIntensity = 0.1;
+    verge.emissiveColor = BABYLON.Color3.FromHexString("#172116");
+    verge.emissiveIntensity = 0.045;
     const markerGlow = createMaterial(
       this.scene,
       "spawn-trail-marker-glow",
-      "#bcfff3",
-      0.14,
-      0.1,
-      "#4adfd0"
+      "#a9eee4",
+      0.16,
+      0.08,
+      "#3acbbb"
     );
 
     const pavers: any[] = [];
@@ -201,62 +209,74 @@ export class VisualRecoveryDirector {
     const markerMeshes: any[] = [];
 
     for (let index = 0; index < 20; index += 1) {
-      const z = 12 - index * 4.8;
-      const x = Math.sin(index * 0.42) * 0.75;
+      const z = -6 - index * 4.45;
+      const x = Math.sin(index * 0.42) * 0.58;
       const paver = BABYLON.MeshBuilder.CreateBox(`spawn-trail-paver-${index}`, {
-        width: 4.8 + (index % 3) * 0.35,
-        height: 0.16,
-        depth: 3.5
+        width: 3.25 + (index % 3) * 0.22,
+        height: 0.11,
+        depth: 1.65 + (index % 2) * 0.14
       }, this.scene);
-      paver.position = new BABYLON.Vector3(x, this.world.heightAt(x, z) + 0.08, z);
-      paver.rotation.y = Math.sin(index * 0.61) * 0.025;
+      paver.position = new BABYLON.Vector3(x, this.world.heightAt(x, z) + 0.055, z);
+      paver.rotation.y = Math.sin(index * 0.61) * 0.035;
       paver.material = roadStone;
       paver.receiveShadows = true;
       pavers.push(paver);
 
       [-1, 1].forEach((side) => {
         if (index % 2 !== 0) return;
-        const sideX = x + side * (4.2 + (index % 3) * 0.3);
+        const sideX = x + side * (4.4 + (index % 3) * 0.35);
         const rootY = this.world.heightAt(sideX, z);
         for (let bladeIndex = 0; bladeIndex < 3; bladeIndex += 1) {
           const blade = BABYLON.MeshBuilder.CreateCylinder(`spawn-verge-${index}-${side}-${bladeIndex}`, {
-            height: 0.65 + bladeIndex * 0.12,
+            height: 0.62 + bladeIndex * 0.11,
             diameterTop: 0.018,
-            diameterBottom: 0.09,
+            diameterBottom: 0.085,
             tessellation: 3
           }, this.scene);
           blade.position = new BABYLON.Vector3(
             sideX + (bladeIndex - 1) * 0.18,
-            rootY + 0.32,
+            rootY + 0.31,
             z + (bladeIndex - 1) * 0.14
           );
           blade.rotation.z = side * (bladeIndex - 1) * 0.08;
           blade.material = verge;
           vergeMeshes.push(blade);
         }
+
+        if (index % 4 === 0) {
+          const shrub = BABYLON.MeshBuilder.CreatePolyhedron(`spawn-shrub-${index}-${side}`, {
+            type: index % 2,
+            size: 0.62
+          }, this.scene);
+          shrub.position = new BABYLON.Vector3(sideX + side * 0.7, rootY + 0.35, z - 0.8);
+          shrub.scaling = new BABYLON.Vector3(1.45, 0.62, 1.1);
+          shrub.rotation.y = index * 0.73;
+          shrub.material = verge;
+          vergeMeshes.push(shrub);
+        }
       });
     }
 
     [-1, 1].forEach((side) => {
       for (let index = 0; index < 4; index += 1) {
-        const z = -8 - index * 20;
-        const x = side * 5.7;
+        const z = -12 - index * 20;
+        const x = side * 5.9;
         const baseY = this.world.heightAt(x, z);
         const post = BABYLON.MeshBuilder.CreateCylinder(`spawn-waymarker-post-${side}-${index}`, {
-          height: 1.65,
-          diameterTop: 0.18,
-          diameterBottom: 0.28,
+          height: 1.55,
+          diameterTop: 0.16,
+          diameterBottom: 0.25,
           tessellation: 6
         }, this.scene);
-        post.position = new BABYLON.Vector3(x, baseY + 0.82, z);
+        post.position = new BABYLON.Vector3(x, baseY + 0.77, z);
         post.material = roadStone;
         markerMeshes.push(post);
 
         const light = BABYLON.MeshBuilder.CreatePolyhedron(`spawn-waymarker-light-${side}-${index}`, {
           type: 1,
-          size: 0.27
+          size: 0.23
         }, this.scene);
-        light.position = new BABYLON.Vector3(x, baseY + 1.78, z);
+        light.position = new BABYLON.Vector3(x, baseY + 1.66, z);
         light.material = markerGlow;
         markerMeshes.push(light);
       }
