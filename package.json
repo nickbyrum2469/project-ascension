@@ -11,6 +11,9 @@
     "preview": "vite preview --host 0.0.0.0",
     "test:smoke": "node scripts/smoke-test.mjs"
   },
+  "dependencies": {
+    "babylonjs": "9.16.1"
+  },
   "devDependencies": {
     "typescript": "^5.8.3",
     "vite": "^7.0.0"
