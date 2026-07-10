@@ -110,6 +110,53 @@ const installFloorTwoSafety = (game: any, floorTwo: FloorTwoArrivalDirector): vo
   }
 };
 
+const consolidateFloorTwoStaticGeometry = (game: any): void => {
+  const scene = game.world.scene;
+  const preserved = [
+    "floor-two-rift-shear",
+    "floor-two-threshold-fragment",
+    "floor-two-survey-lens"
+  ];
+  const groups = new Map<string, any[]>();
+
+  for (const mesh of [...scene.meshes]) {
+    const name = String(mesh.name ?? "");
+    if (!name.startsWith("floor-two-") || preserved.some((prefix) => name.startsWith(prefix))) continue;
+    if (!mesh.material || mesh.isDisposed?.() || Number(mesh.getTotalVertices?.() ?? 0) <= 0) continue;
+    const key = String(mesh.material.uniqueId ?? mesh.material.name ?? "floor-two-material");
+    const group = groups.get(key) ?? [];
+    group.push(mesh);
+    groups.set(key, group);
+  }
+
+  let sourceCount = 0;
+  let batchCount = 0;
+  for (const meshes of groups.values()) {
+    if (meshes.length < 2) continue;
+    const cameraCollision = meshes.some((mesh) => mesh.metadata?.cameraCollision === true);
+    const receiveShadows = meshes.some((mesh) => mesh.receiveShadows === true);
+    meshes.forEach((mesh) => {
+      mesh.unfreezeWorldMatrix?.();
+      mesh.computeWorldMatrix(true);
+    });
+    const merged = BABYLON.Mesh.MergeMeshes(meshes, true, true, undefined, false, false);
+    if (!merged) {
+      meshes.forEach((mesh) => mesh.freezeWorldMatrix?.());
+      continue;
+    }
+    sourceCount += meshes.length;
+    batchCount += 1;
+    merged.name = `batched-floor-two-${batchCount}`;
+    merged.metadata = cameraCollision ? { cameraCollision: true } : {};
+    merged.isPickable = cameraCollision;
+    merged.receiveShadows = receiveShadows;
+    merged.computeWorldMatrix(true);
+    merged.freezeWorldMatrix();
+  }
+
+  console.info(`[Performance] Batched ${sourceCount} Floor Two static meshes into ${batchCount} material groups.`);
+};
+
 const boot = async (): Promise<void> => {
   const canvas = getCanvas();
   const status = document.getElementById("boot-status");
@@ -124,10 +171,11 @@ const boot = async (): Promise<void> => {
     new LoadoutOverlay();
     game.world.mara.root.position.y += 0.31;
     applyEmergencyGpuBudget(game);
-    new PerformanceDirector(engine, game.world, renderer);
-    new CombatFeelDirector(game, engine);
     const floorTwo = new FloorTwoArrivalDirector(game);
     installFloorTwoSafety(game, floorTwo);
+    consolidateFloorTwoStaticGeometry(game);
+    new PerformanceDirector(engine, game.world, renderer);
+    new CombatFeelDirector(game, engine);
     game.run();
   } catch (error) {
     console.error(error);
