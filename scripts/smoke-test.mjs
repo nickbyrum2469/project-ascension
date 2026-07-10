@@ -96,7 +96,10 @@ for (const requiredFeature of [
   "oran pell · riftglass attunement",
   "data-charm",
   "keyl",
-  "loadout-strip"
+  "loadout-strip",
+  "installinterfacepauseguard",
+  ".journal-shell.open, .loadout-overlay.open",
+  ".journal-shell.open, .pause-panel:not(.hidden), .dialogue-panel:not(.hidden)"
 ]) {
   if (!productionSource.includes(requiredFeature)) {
     throw new Error(`Missing required production feature: ${requiredFeature}`);
