@@ -1,0 +1,36 @@
+name: Foundation Quality Gate
+
+on:
+  push:
+    branches: [main, "foundation/**"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Type-check
+        run: npm run check
+      - name: Production smoke checks
+        run: npm run test:smoke
+      - name: Build browser release
+        run: npm run build
+      - name: Upload browser build
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-ascension-browser-build
+          path: dist
+          if-no-files-found: error
+          retention-days: 14
