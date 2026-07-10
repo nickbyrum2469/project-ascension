@@ -1,13 +1,15 @@
-import type { Damageable } from "../data/GameTypes.js";
+import type { Damageable, EnemyKind } from "../data/GameTypes.js";
 import type { AudioDirector } from "../audio/AudioDirector.js";
 import type { QuestSystem } from "./QuestSystem.js";
 import type { World } from "../world/World.js";
 import { createMaterial, createRiftBoar, type BoarVisual } from "../world/ProceduralAssets.js";
+import { createRiftWisp } from "../world/RiftWispAsset.js";
 
 export type BoarState = "idle" | "chase" | "windup" | "slam" | "recover" | "hit" | "dead";
 
 export class RiftBoar implements Damageable {
   public readonly name: string;
+  public readonly kind: EnemyKind;
   public readonly visual: BoarVisual;
   public readonly root: any;
   public health: number;
@@ -15,11 +17,14 @@ export class RiftBoar implements Damageable {
   public alive: boolean;
 
   private readonly isGuardian: boolean;
+  private readonly isWisp: boolean;
+  private readonly homePosition: any;
   private readonly guardianRings: any[] = [];
   private readonly telegraphRoot: any;
   private readonly telegraphRing: any;
   private readonly telegraphSweep: any;
   private readonly telegraphMaterial: any;
+  private readonly wispTarget = new BABYLON.Vector3();
   private state: BoarState = "idle";
   private stateTime = 0;
   private patrolTime = 0;
@@ -29,6 +34,10 @@ export class RiftBoar implements Damageable {
   private walkCycle = 0;
   private attackPattern = 0;
   private awakened = false;
+  private wispBolt: any = null;
+  private wispBoltDirection = new BABYLON.Vector3();
+  private wispBoltLife = 0;
+  private wispRespawnTime = 0;
 
   constructor(
     private readonly world: World,
@@ -40,19 +49,24 @@ export class RiftBoar implements Damageable {
     private readonly onImpact: (position: any, heavy: boolean) => void
   ) {
     this.isGuardian = index === 4;
-    this.name = this.isGuardian ? "Foundry Sentinel" : "Rift Boar";
-    this.maxHealth = this.isGuardian ? 480 : 80;
+    this.isWisp = index === 3;
+    this.kind = this.isGuardian ? "foundry-sentinel" : this.isWisp ? "rift-wisp" : "rift-boar";
+    this.name = this.isGuardian ? "Foundry Sentinel" : this.isWisp ? "Rift Wisp Constellation" : "Rift Boar";
+    this.maxHealth = this.isGuardian ? 480 : this.isWisp ? 64 : 80;
     this.health = this.maxHealth;
     this.alive = this.isGuardian ? !quests.save.labyrinth.guardianDefeated : true;
 
-    this.visual = createRiftBoar(world.scene, index);
+    this.visual = this.isWisp ? createRiftWisp(world.scene, index) : createRiftBoar(world.scene, index);
     this.root = this.visual.root;
     this.root.position.copyFrom(position);
     if (this.isGuardian) {
       const guardianX = world.labyrinthPosition.x;
       const guardianZ = world.labyrinthPosition.z - 76;
       this.root.position.copyFrom(new BABYLON.Vector3(guardianX, world.heightAt(guardianX, guardianZ), guardianZ));
+    } else if (this.isWisp) {
+      this.root.position.y = world.heightAt(this.root.position.x, this.root.position.z) + 2.65;
     }
+    this.homePosition = this.root.position.clone();
     this.root.rotation.y = index * 1.7;
     this.root.getChildMeshes().forEach((mesh: any) => world.shadowGenerator.addShadowCaster(mesh));
     this.patrolHeading = this.root.rotation.y;
@@ -72,6 +86,7 @@ export class RiftBoar implements Damageable {
 
   public update(delta: number, playerPosition: any, playerBlocking: boolean): void {
     this.stateTime += delta;
+    this.updateWispBolt(delta, playerPosition, playerBlocking);
 
     if (this.isGuardian) {
       if (!this.quests.save.labyrinth.entered) {
@@ -90,6 +105,10 @@ export class RiftBoar implements Damageable {
     if (!this.alive) {
       this.telegraphRoot.setEnabled(false);
       this.animateDeath(delta);
+      if (this.isWisp) {
+        this.wispRespawnTime -= delta;
+        if (this.wispRespawnTime <= 0) this.reviveWisp();
+      }
       return;
     }
 
@@ -100,29 +119,36 @@ export class RiftBoar implements Damageable {
 
     if (this.isGuardian) {
       this.updateGuardian(delta, playerPosition, playerBlocking, distance, direction);
+    } else if (this.isWisp) {
+      this.updateWisp(delta, playerPosition, distance, direction);
     } else {
       this.updateBoar(delta, playerPosition, playerBlocking, distance, direction);
     }
 
     const ground = this.world.heightAt(this.root.position.x, this.root.position.z);
-    this.root.position.y = ground;
+    this.root.position.y = this.isWisp
+      ? ground + 2.55 + Math.sin(this.walkCycle * 0.7) * 0.22
+      : ground;
     this.updateCombatTelegraph(delta, ground);
     this.animate(delta);
   }
 
   public takeDamage(amount: number, impulse: any): void {
     if (!this.alive || (this.isGuardian && !this.quests.save.labyrinth.entered)) return;
-    this.health = Math.max(0, this.health - amount);
-    this.audio.impact(amount > 35);
+    const effectiveAmount = amount * this.quests.outgoingDamageMultiplier(this.kind);
+    this.health = Math.max(0, this.health - effectiveAmount);
+    this.audio.impact(effectiveAmount > 35);
     this.onImpact(
-      this.root.position.add(new BABYLON.Vector3(0, this.isGuardian ? 2.1 : 1.05, 0.5)),
-      amount > 35
+      this.root.position.add(new BABYLON.Vector3(0, this.isGuardian ? 2.1 : this.isWisp ? 0 : 1.05, this.isWisp ? 0 : 0.5)),
+      effectiveAmount > 35
     );
 
     const planarImpulse = new BABYLON.Vector3(impulse.x, 0, impulse.z);
     if (planarImpulse.lengthSquared() > 0.001) {
       planarImpulse.normalize();
-      this.hitImpulse = planarImpulse.scale(this.isGuardian ? (amount > 35 ? 1.8 : 0.7) : (amount > 35 ? 5.8 : 3.2));
+      this.hitImpulse = planarImpulse.scale(
+        this.isGuardian ? (effectiveAmount > 35 ? 1.8 : 0.7) : this.isWisp ? 1.4 : (effectiveAmount > 35 ? 5.8 : 3.2)
+      );
     }
 
     if (this.health <= 0) {
@@ -135,8 +161,13 @@ export class RiftBoar implements Damageable {
         this.guardianRings.forEach((ring) => {
           ring.material.emissiveIntensity = 4.2;
         });
+      } else if (this.isWisp) {
+        this.quests.recordEnemyDefeat(this.kind);
+        this.wispRespawnTime = 36;
+        this.visual.rune.material.emissiveIntensity = 4.4;
       } else {
         this.quests.recordBoarDefeat();
+        this.quests.recordEnemyDefeat(this.kind);
         this.visual.rune.scaling.setAll(1.8);
         this.visual.rune.material.emissiveIntensity = 2.6;
         window.setTimeout(() => {
@@ -186,7 +217,7 @@ export class RiftBoar implements Damageable {
             this.onImpact(playerPosition.add(new BABYLON.Vector3(0, 1, 0)), true);
             this.takeDamage(12, direction.scale(-1));
           } else {
-            this.onPlayerDamage(18, this.root.position.clone());
+            this.damagePlayer(18);
           }
         }
       }
@@ -198,6 +229,44 @@ export class RiftBoar implements Damageable {
     } else if (this.state === "hit") {
       this.applyHitReaction(delta);
       if (this.stateTime >= 0.28) this.setState("chase");
+    }
+  }
+
+  private updateWisp(delta: number, playerPosition: any, distance: number, direction: any): void {
+    if (this.state === "idle") {
+      const toHome = this.homePosition.subtract(this.root.position);
+      toHome.y = 0;
+      if (toHome.length() > 5) this.root.position.addInPlace(toHome.normalize().scale(delta * 1.4));
+      this.root.rotation.y += delta * 0.35;
+      if (distance < 23) this.setState("chase");
+    } else if (this.state === "chase") {
+      this.face(direction, delta * 4.8);
+      const tangent = new BABYLON.Vector3(direction.z, 0, -direction.x);
+      const radial = distance < 7 ? direction.scale(-1) : distance > 13 ? direction : BABYLON.Vector3.Zero();
+      const orbitDirection = tangent.scale(Math.sin(this.stateTime * 0.85) >= 0 ? 1 : -1).add(radial.scale(1.35));
+      if (orbitDirection.lengthSquared() > 0.001) orbitDirection.normalize();
+      this.root.position.addInPlace(orbitDirection.scale(delta * 3.1));
+      if (distance > 29) this.setState("idle");
+      else if (this.stateTime > 2.05) this.setState("windup");
+    } else if (this.state === "windup") {
+      this.face(direction, delta * 6.5);
+      if (this.stateTime < 0.08) this.wispTarget.copyFrom(playerPosition);
+      const charge = BABYLON.Scalar.Clamp(this.stateTime / 0.86, 0, 1);
+      this.visual.rune.scaling.setAll(1 + charge * 0.42 + Math.sin(this.stateTime * 28) * 0.06);
+      this.visual.body.scaling.setAll(1 - charge * 0.12);
+      if (!this.attackConnected && this.stateTime >= 0.82) {
+        this.attackConnected = true;
+        this.spawnWispBolt(this.wispTarget);
+      }
+      if (this.stateTime >= 0.98) this.setState("recover");
+    } else if (this.state === "recover") {
+      this.visual.rune.scaling.setAll(BABYLON.Scalar.Lerp(this.visual.rune.scaling.x, 1, delta * 8));
+      this.visual.body.scaling.setAll(BABYLON.Scalar.Lerp(this.visual.body.scaling.x, 1, delta * 8));
+      if (this.stateTime > 0.64) this.setState(distance < 25 ? "chase" : "idle");
+    } else if (this.state === "hit") {
+      this.applyHitReaction(delta);
+      this.visual.rune.rotation.z += delta * 7;
+      if (this.stateTime > 0.25) this.setState("chase");
     }
   }
 
@@ -252,10 +321,10 @@ export class RiftBoar implements Damageable {
           if (playerBlocking) {
             this.audio.guard();
             this.onImpact(playerPosition.add(new BABYLON.Vector3(0, 1.2, 0)), true);
-            this.health = Math.max(1, this.health - 16);
+            this.health = Math.max(1, this.health - 16 * this.quests.outgoingDamageMultiplier(this.kind));
             this.setState("hit");
           } else {
-            this.onPlayerDamage(enraged ? 34 : 28, this.root.position.clone());
+            this.damagePlayer(enraged ? 34 : 28);
           }
         }
       }
@@ -277,7 +346,7 @@ export class RiftBoar implements Damageable {
             this.audio.guard();
             this.onImpact(playerPosition.add(new BABYLON.Vector3(0, 1.1, 0)), true);
           } else {
-            this.onPlayerDamage(enraged ? 38 : 31, this.root.position.clone());
+            this.damagePlayer(enraged ? 38 : 31);
           }
         }
       }
@@ -286,7 +355,7 @@ export class RiftBoar implements Damageable {
       this.root.scaling.z = BABYLON.Scalar.Lerp(this.root.scaling.z, 2.2, delta * 7);
       this.visual.body.position.y = BABYLON.Scalar.Lerp(this.visual.body.position.y, 0, delta * 8);
       this.visual.rune.scaling.setAll(BABYLON.Scalar.Lerp(this.visual.rune.scaling.x, 1, delta * 7));
-      this.visual.head.rotation.x = BABYLON.Scalar.Lerp(this.visual.head.rotation.x, 0, delta * 6);
+      this.visual.head.rotation.x = BABYLON.Scalar.Lerp(this.visual.head.rotation.x, 0, delta * 7);
       if (this.stateTime >= (enraged ? 0.42 : 0.62)) this.setState("chase");
     } else if (this.state === "hit") {
       this.applyHitReaction(delta);
@@ -300,10 +369,10 @@ export class RiftBoar implements Damageable {
     const material = createMaterial(
       this.world.scene,
       `boar-telegraph-material-${index}`,
-      this.isGuardian ? "#ff6a3d" : "#ffb34d",
+      this.isGuardian ? "#ff6a3d" : this.isWisp ? "#ffd36f" : "#ffb34d",
       0.05,
       0.12,
-      this.isGuardian ? "#ff3d2e" : "#ff8a32"
+      this.isGuardian ? "#ff3d2e" : this.isWisp ? "#ff9d42" : "#ff8a32"
     );
     material.alpha = 0;
     material.emissiveIntensity = 2.4;
@@ -311,7 +380,7 @@ export class RiftBoar implements Damageable {
 
     const ring = BABYLON.MeshBuilder.CreateTorus(`boar-danger-ring-${index}`, {
       diameter: 2,
-      thickness: this.isGuardian ? 0.085 : 0.055,
+      thickness: this.isGuardian ? 0.085 : this.isWisp ? 0.07 : 0.055,
       tessellation: 64
     }, this.world.scene);
     ring.rotation.x = Math.PI / 2;
@@ -345,21 +414,94 @@ export class RiftBoar implements Damageable {
     if (!this.telegraphRoot.isEnabled()) this.telegraphRoot.setEnabled(true);
     const enraged = this.isGuardian && this.health <= this.maxHealth * 0.5;
     const isSlam = this.state === "slam";
-    const duration = isSlam ? (enraged ? 0.72 : 0.92) : (this.isGuardian ? (enraged ? 0.58 : 0.78) : 0.58);
+    const duration = this.isWisp
+      ? 0.86
+      : isSlam
+        ? (enraged ? 0.72 : 0.92)
+        : (this.isGuardian ? (enraged ? 0.58 : 0.78) : 0.58);
     const progress = BABYLON.Scalar.Clamp(this.stateTime / duration, 0, 1);
-    const radius = isSlam ? (enraged ? 6.8 : 5.8) : (this.isGuardian ? 4.15 : 2.05);
+    const radius = this.isWisp
+      ? 2.25
+      : isSlam
+        ? (enraged ? 6.8 : 5.8)
+        : (this.isGuardian ? 4.15 : 2.05);
     const anticipation = 0.78 + progress * 0.22;
 
-    this.telegraphRoot.position.copyFromFloats(this.root.position.x, ground + 0.055, this.root.position.z);
-    this.telegraphRoot.rotation.y = this.root.rotation.y;
+    if (this.isWisp) {
+      const targetGround = this.world.heightAt(this.wispTarget.x, this.wispTarget.z);
+      this.telegraphRoot.position.copyFromFloats(this.wispTarget.x, targetGround + 0.055, this.wispTarget.z);
+      this.telegraphRoot.rotation.y = 0;
+    } else {
+      this.telegraphRoot.position.copyFromFloats(this.root.position.x, ground + 0.055, this.root.position.z);
+      this.telegraphRoot.rotation.y = this.root.rotation.y;
+    }
     this.telegraphRing.scaling.setAll(radius * anticipation);
     this.telegraphSweep.scaling.setAll(radius * anticipation);
-    this.telegraphSweep.setEnabled(!isSlam);
+    this.telegraphSweep.setEnabled(!isSlam && !this.isWisp);
     this.telegraphRing.setEnabled(true);
-    this.telegraphRing.rotation.z += delta * (enraged ? 3.8 : 2.5);
+    this.telegraphRing.rotation.z += delta * (enraged ? 3.8 : this.isWisp ? 4.6 : 2.5);
     this.telegraphSweep.rotation.z = Math.PI / 2 + Math.sin(this.stateTime * 7) * 0.08;
     this.telegraphMaterial.alpha = 0.18 + progress * 0.58 + Math.sin(this.stateTime * 22) * 0.06;
-    this.telegraphMaterial.emissiveIntensity = (enraged ? 3.8 : 2.4) + progress * 2.2;
+    this.telegraphMaterial.emissiveIntensity = (enraged ? 3.8 : this.isWisp ? 3.2 : 2.4) + progress * 2.2;
+  }
+
+  private spawnWispBolt(target: any): void {
+    this.disposeWispBolt();
+    const root = new BABYLON.TransformNode(`rift-wisp-bolt-${performance.now()}`, this.world.scene);
+    root.position.copyFrom(this.root.position);
+    const material = createMaterial(this.world.scene, `rift-wisp-bolt-material-${performance.now()}`, "#fff0aa", 0.05, 0.08, "#ff9d42");
+    material.emissiveIntensity = 4.4;
+    const orb = BABYLON.MeshBuilder.CreatePolyhedron(`rift-wisp-bolt-core-${performance.now()}`, { type: 1, size: 0.34 }, this.world.scene);
+    orb.material = material;
+    orb.parent = root;
+    const ring = BABYLON.MeshBuilder.CreateTorus(`rift-wisp-bolt-ring-${performance.now()}`, {
+      diameter: 0.95,
+      thickness: 0.045,
+      tessellation: 20
+    }, this.world.scene);
+    ring.rotation.x = Math.PI / 2;
+    ring.material = material;
+    ring.parent = root;
+    const direction = target.add(new BABYLON.Vector3(0, 0.8, 0)).subtract(root.position);
+    this.wispBoltDirection = direction.lengthSquared() > 0.001 ? direction.normalize() : BABYLON.Vector3.Forward();
+    this.wispBolt = root;
+    this.wispBoltLife = 2.4;
+    this.audio.creatureCharge();
+  }
+
+  private updateWispBolt(delta: number, playerPosition: any, playerBlocking: boolean): void {
+    if (!this.wispBolt) return;
+    this.wispBoltLife -= delta;
+    this.wispBolt.position.addInPlace(this.wispBoltDirection.scale(delta * 15.5));
+    this.wispBolt.rotation.y += delta * 9;
+    this.wispBolt.rotation.z += delta * 5;
+    const target = playerPosition.add(new BABYLON.Vector3(0, 0.9, 0));
+    if (BABYLON.Vector3.Distance(this.wispBolt.position, target) <= 1.25) {
+      if (playerBlocking) {
+        this.audio.guard();
+        this.onImpact(target, true);
+        if (this.alive) this.takeDamage(14, this.wispBoltDirection.scale(-1));
+      } else {
+        this.damagePlayer(17);
+        this.onImpact(target, false);
+      }
+      this.disposeWispBolt();
+      return;
+    }
+    if (this.wispBoltLife <= 0) this.disposeWispBolt();
+  }
+
+  private disposeWispBolt(): void {
+    if (!this.wispBolt) return;
+    this.wispBolt.getChildMeshes().forEach((mesh: any) => mesh.dispose(false, true));
+    this.wispBolt.dispose();
+    this.wispBolt = null;
+    this.wispBoltLife = 0;
+  }
+
+  private damagePlayer(amount: number): void {
+    const adjusted = amount * this.quests.incomingDamageMultiplier(this.kind);
+    this.onPlayerDamage(adjusted, this.root.position.clone());
   }
 
   private applyHitReaction(delta: number): void {
@@ -370,6 +512,13 @@ export class RiftBoar implements Damageable {
 
   private animateDeath(delta: number): void {
     if (!this.root.isEnabled()) return;
+    if (this.isWisp) {
+      this.root.rotation.y += delta * 5.5;
+      this.root.scaling.setAll(Math.max(0.04, 1 - this.stateTime * 0.7));
+      this.root.position.y -= delta * 0.55;
+      if (this.stateTime > 1.45) this.root.setEnabled(false);
+      return;
+    }
     const targetRotation = this.isGuardian ? -Math.PI / 2 : Math.PI / 2;
     this.root.rotation.z = BABYLON.Scalar.Lerp(this.root.rotation.z, targetRotation, delta * (this.isGuardian ? 1.3 : 3.2));
     this.root.position.y = BABYLON.Scalar.Lerp(
@@ -386,6 +535,24 @@ export class RiftBoar implements Damageable {
     }
   }
 
+  private reviveWisp(): void {
+    this.alive = true;
+    this.health = this.maxHealth;
+    this.state = "idle";
+    this.stateTime = 0;
+    this.attackConnected = false;
+    this.root.position.copyFrom(this.homePosition);
+    this.root.rotation.copyFromFloats(0, 0, 0);
+    this.root.scaling.setAll(1);
+    this.visual.body.scaling.setAll(1);
+    this.visual.body.rotation.copyFromFloats(0, 0, 0);
+    this.visual.rune.scaling.setAll(1);
+    this.visual.rune.material.emissiveIntensity = 2.1;
+    this.root.setEnabled(true);
+    this.telegraphRoot.setEnabled(false);
+    this.onImpact(this.root.position.clone(), true);
+  }
+
   private move(direction: any, speed: number, delta: number): void {
     this.face(direction, delta * (this.isGuardian ? 5.8 : 4.5));
     this.root.position.addInPlace(direction.scale(speed * delta));
@@ -397,6 +564,23 @@ export class RiftBoar implements Damageable {
   }
 
   private animate(delta: number): void {
+    if (this.isWisp) {
+      this.walkCycle += delta * (this.state === "windup" ? 8.5 : 3.8);
+      this.visual.rune.rotation.y += delta * 1.7;
+      this.visual.rune.rotation.z += delta * 0.55;
+      const secondaryRing = this.root.metadata?.secondaryRing;
+      if (secondaryRing) {
+        secondaryRing.rotation.y -= delta * 1.15;
+        secondaryRing.rotation.z += delta * 0.42;
+      }
+      this.visual.legs.forEach((bladeRig, index) => {
+        bladeRig.rotation.y += delta * (0.35 + index * 0.06) * (index % 2 === 0 ? 1 : -1);
+        bladeRig.rotation.z = Math.sin(this.walkCycle + index) * 0.18;
+      });
+      this.visual.head.rotation.y += delta * 0.9;
+      return;
+    }
+
     const moving = this.state === "chase" || this.state === "idle";
     const pace = this.isGuardian ? (this.state === "chase" ? 6.8 : 2.8) : (this.state === "chase" ? 9 : 4.5);
     this.walkCycle += delta * pace;
