@@ -31,6 +31,7 @@ if (
 
 for (const feature of [
   "caelusTownPhaseTwoVersion: 1",
+  "phaseTwoRoadVisualRevision: 2",
   "phaseTwoWellRecovered",
   "phaseTwoDrainageBands",
   "phaseTwoCollisionAudit",
@@ -41,6 +42,10 @@ for (const feature of [
   'id: "service-lane"',
   "`caelus-phase2-${definition.id}-curb-${",
   "`caelus-phase2-${definition.id}-channel-${",
+  "0.24,",
+  "0.082,",
+  "0.15,",
+  "0.058,",
   "collisionCenter: { x: -10, z: 112 }",
   "duplicatePairs",
   "mainRouteIntrusions",
@@ -52,10 +57,13 @@ for (const feature of [
 for (const feature of [
   "phaseTwoAudit",
   "phaseTwoCollisionProbe",
+  "roadVisualRevision",
   "missingDrainageMeshes",
   "transparentPhaseTwoMaterials",
   "wellRootOffsetX",
   "roadMaterialFrozen",
+  "curbHalfWidth",
+  "channelHalfWidth",
   '"caelus-phase2-main-street-curb-left"',
   '"caelus-phase2-service-lane-channel-right"'
 ]) {
@@ -65,9 +73,13 @@ for (const feature of [
 for (const assertion of [
   'bridgeCall<PhaseTwoAudit>(page, "phaseTwoAudit")',
   'bridgeCall<CollisionProbe>(page, "phaseTwoCollisionProbe"',
+  "audit.roadVisualRevision",
+  "audit.curbHalfWidth",
+  "audit.channelHalfWidth",
   "audit.drainageBandCount",
   "audit.collisionAudit?.duplicatePairs",
   "audit.collisionAudit?.mainRouteIntrusions",
+  "captureLockedView",
   '"phase2-main-road-drainage"',
   '"phase2-relocated-town-well"',
   '"phase2-market-lane-drainage"',
