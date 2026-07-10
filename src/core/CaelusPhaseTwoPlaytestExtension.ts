@@ -55,6 +55,8 @@ export class CaelusPhaseTwoPlaytestExtension {
         return mesh && !mesh.isEnabled?.();
       });
       const well = scene.getMeshByName?.("caelus-phase1-town-well");
+      const representativeCurb = scene.getMeshByName?.("caelus-phase2-main-street-curb-left");
+      const representativeChannel = scene.getMeshByName?.("caelus-phase2-main-street-channel-left");
       const transparentPhaseTwoMaterials = scene.materials.filter((material: any) => {
         const name = String(material.name ?? "");
         return name.startsWith("caelus-phase2-")
@@ -63,6 +65,7 @@ export class CaelusPhaseTwoPlaytestExtension {
 
       return {
         version: Number(metadata.caelusTownPhaseTwoVersion ?? 0),
+        roadVisualRevision: Number(metadata.phaseTwoRoadVisualRevision ?? 0),
         wellRecovered: Boolean(metadata.phaseTwoWellRecovered),
         drainageBandCount: Number(metadata.phaseTwoDrainageBands ?? 0),
         collisionAudit: collisionAudit ?? null,
@@ -74,6 +77,10 @@ export class CaelusPhaseTwoPlaytestExtension {
         wellRelocated: Boolean(well?.metadata?.phaseTwoRelocated),
         roadMaterialFrozen: Boolean(scene.getMaterialByName?.("caelus-phase1-road")?.isFrozen),
         roadEdgeMaterialFrozen: Boolean(scene.getMaterialByName?.("caelus-phase1-road-edge")?.isFrozen),
+        curbHalfWidth: Number(representativeCurb?.metadata?.halfWidth ?? 0),
+        curbHeightOffset: Number(representativeCurb?.metadata?.heightOffset ?? 0),
+        channelHalfWidth: Number(representativeChannel?.metadata?.halfWidth ?? 0),
+        channelHeightOffset: Number(representativeChannel?.metadata?.heightOffset ?? 0),
         phaseTwoMaterialCount: scene.materials.filter((material: any) => (
           String(material.name ?? "").startsWith("caelus-phase2-")
         )).length
