@@ -84,7 +84,7 @@ export const createRiftWisp = (scene: any, index: number): BoarVisual => {
 
   root.metadata = {
     wispVisual: true,
-    secondaryRing,
+    secondaryRing: secondRing,
     warningMaterial: warning,
     edgeMaterial: edge
   };
