@@ -3,6 +3,7 @@ import "./combat-presentation.css";
 import * as BabylonModule from "babylonjs";
 import { RouteAudioDirector } from "./audio/RouteAudioDirector.js";
 import { CaelusPhaseZeroDirector } from "./core/CaelusPhaseZeroDirector.js";
+import { installCaelusTownPhaseOne } from "./core/CaelusTownPhaseOne.js";
 import { CameraSafetyDirector } from "./core/CameraSafetyDirector.js";
 import { CombatFeelDirector } from "./core/CombatFeelDirector.js";
 import { CombatPresentationDirector } from "./core/CombatPresentationDirector.js";
@@ -178,6 +179,7 @@ const boot = async (): Promise<void> => {
     const { Game } = await import("./game/Game.js");
     installInterfacePauseGuard(Game);
     installVerticalSliceRuntimeGuard(VerticalSliceDirector);
+    installCaelusTownPhaseOne(VerticalSliceDirector);
     const { engine, renderer } = await createEngine(canvas);
     const game = new Game(engine, canvas, renderer);
     new ExpeditionJournal();
