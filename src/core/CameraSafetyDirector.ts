@@ -1,10 +1,8 @@
 export class CameraSafetyDirector {
-  private readonly game: any;
   private readonly world: any;
   private readonly player: any;
 
   constructor(game: any) {
-    this.game = game;
     this.world = game.world;
     this.player = game.player;
 
