@@ -2,6 +2,7 @@ import "./styles.css";
 import "./combat-presentation.css";
 import * as BabylonModule from "babylonjs";
 import { RouteAudioDirector } from "./audio/RouteAudioDirector.js";
+import { CameraSafetyDirector } from "./core/CameraSafetyDirector.js";
 import { CombatFeelDirector } from "./core/CombatFeelDirector.js";
 import { CombatPresentationDirector } from "./core/CombatPresentationDirector.js";
 import { FloorTwoArrivalDirector } from "./core/FloorTwoArrivalDirector.js";
@@ -193,6 +194,7 @@ const boot = async (): Promise<void> => {
     new PerformanceDirector(engine, game.world, renderer);
     new CombatFeelDirector(game, engine);
     new CombatPresentationDirector(game);
+    new CameraSafetyDirector(game);
     new RouteAudioDirector(game);
     new PlaytestBridge(game, renderer);
     game.run();
