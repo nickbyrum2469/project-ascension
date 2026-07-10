@@ -19,6 +19,7 @@ export class RiftBoar implements Damageable {
   private readonly isGuardian: boolean;
   private readonly isWisp: boolean;
   private readonly homePosition: any;
+  private readonly baseBodyScaling: any;
   private readonly guardianRings: any[] = [];
   private readonly telegraphRoot: any;
   private readonly telegraphRing: any;
@@ -58,6 +59,7 @@ export class RiftBoar implements Damageable {
 
     this.visual = this.isWisp ? createRiftWisp(world.scene, index) : createRiftBoar(world.scene, index);
     this.root = this.visual.root;
+    this.baseBodyScaling = this.visual.body.scaling.clone();
     this.root.position.copyFrom(position);
     if (this.isGuardian) {
       const guardianX = world.labyrinthPosition.x;
@@ -76,6 +78,13 @@ export class RiftBoar implements Damageable {
     this.telegraphRing = telegraph.ring;
     this.telegraphSweep = telegraph.sweep;
     this.telegraphMaterial = telegraph.material;
+    this.root.onDisposeObservable?.add(() => {
+      this.disposeWispBolt();
+      if (!this.telegraphRoot.isDisposed?.()) {
+        this.telegraphRoot.getChildMeshes().forEach((mesh: any) => mesh.dispose(false, true));
+        this.telegraphRoot.dispose();
+      }
+    });
 
     if (this.isGuardian) {
       this.createGuardianPresentation();
@@ -247,13 +256,16 @@ export class RiftBoar implements Damageable {
       if (orbitDirection.lengthSquared() > 0.001) orbitDirection.normalize();
       this.root.position.addInPlace(orbitDirection.scale(delta * 3.1));
       if (distance > 29) this.setState("idle");
-      else if (this.stateTime > 2.05) this.setState("windup");
+      else if (this.stateTime > 2.05) {
+        this.wispTarget.copyFrom(playerPosition);
+        this.setState("windup");
+      }
     } else if (this.state === "windup") {
       this.face(direction, delta * 6.5);
       if (this.stateTime < 0.08) this.wispTarget.copyFrom(playerPosition);
       const charge = BABYLON.Scalar.Clamp(this.stateTime / 0.86, 0, 1);
       this.visual.rune.scaling.setAll(1 + charge * 0.42 + Math.sin(this.stateTime * 28) * 0.06);
-      this.visual.body.scaling.setAll(1 - charge * 0.12);
+      this.visual.body.scaling.copyFrom(this.baseBodyScaling.scale(1 - charge * 0.12));
       if (!this.attackConnected && this.stateTime >= 0.82) {
         this.attackConnected = true;
         this.spawnWispBolt(this.wispTarget);
@@ -261,7 +273,9 @@ export class RiftBoar implements Damageable {
       if (this.stateTime >= 0.98) this.setState("recover");
     } else if (this.state === "recover") {
       this.visual.rune.scaling.setAll(BABYLON.Scalar.Lerp(this.visual.rune.scaling.x, 1, delta * 8));
-      this.visual.body.scaling.setAll(BABYLON.Scalar.Lerp(this.visual.body.scaling.x, 1, delta * 8));
+      this.visual.body.scaling.copyFrom(
+        BABYLON.Vector3.Lerp(this.visual.body.scaling, this.baseBodyScaling, Math.min(1, delta * 8))
+      );
       if (this.stateTime > 0.64) this.setState(distance < 25 ? "chase" : "idle");
     } else if (this.state === "hit") {
       this.applyHitReaction(delta);
@@ -541,10 +555,11 @@ export class RiftBoar implements Damageable {
     this.state = "idle";
     this.stateTime = 0;
     this.attackConnected = false;
+    this.disposeWispBolt();
     this.root.position.copyFrom(this.homePosition);
     this.root.rotation.copyFromFloats(0, 0, 0);
     this.root.scaling.setAll(1);
-    this.visual.body.scaling.setAll(1);
+    this.visual.body.scaling.copyFrom(this.baseBodyScaling);
     this.visual.body.rotation.copyFromFloats(0, 0, 0);
     this.visual.rune.scaling.setAll(1);
     this.visual.rune.material.emissiveIntensity = 2.1;
