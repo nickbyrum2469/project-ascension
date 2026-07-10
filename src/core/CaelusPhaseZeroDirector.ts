@@ -101,6 +101,7 @@ export class CaelusPhaseZeroDirector {
     const exactNames = new Set([
       "vertical-slice-wall-walks",
       "vertical-slice-wall-merlons",
+      "vertical-slice-plaza-monuments",
       "vertical-slice-pillar-collars",
       "vertical-slice-pillar-ascent-rune"
     ]);
