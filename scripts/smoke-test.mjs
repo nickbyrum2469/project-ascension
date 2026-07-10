@@ -59,7 +59,12 @@ for (const requiredFeature of [
   "animatefirstpersonattack",
   "animatefirstpersonguard",
   "resolvevisiblegates",
-  "foundation-rib-collar"
+  "foundation-rib-collar",
+  "createcombattelegraph",
+  "boar-danger-ring",
+  "boar-danger-sweep",
+  "updatecombattelegraph",
+  "emissiveintensity"
 ]) {
   if (!productionSource.includes(requiredFeature)) {
     throw new Error(`Missing required reconstruction feature: ${requiredFeature}`);
