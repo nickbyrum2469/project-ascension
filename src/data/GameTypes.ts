@@ -39,6 +39,7 @@ export interface LabyrinthSave {
   unlocked: boolean;
   entered: boolean;
   sigilsActivated: boolean[];
+  guardianDefeated: boolean;
   coreRestored: boolean;
   shortcutOpened: boolean;
 }
