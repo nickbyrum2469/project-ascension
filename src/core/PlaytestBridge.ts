@@ -19,10 +19,14 @@ const checkpoints: Record<string, PlaytestCheckpoint> = {
   "frontier-combat": { x: 0, z: -60, yaw: Math.PI },
   "gate-exterior": { x: 0, z: 5, yaw: 0 },
   "gate-interior": { x: 0, z: 34, yaw: 0 },
-  "city-boulevard": { x: 0, z: 74, yaw: 0 },
-  "city-market": { x: 0, z: 91, yaw: 0 },
-  "city-plaza": { x: 0, z: 112, yaw: 0 },
-  "city-north": { x: 0, z: 176, yaw: Math.PI },
+  "city-main-south": { x: 2, z: 67, yaw: 0 },
+  "city-market": { x: -31, z: 113, yaw: -0.7 },
+  "city-center": { x: 6, z: 112, yaw: Math.PI * 0.5 },
+  "city-guild": { x: 29, z: 128, yaw: 0.5 },
+  "city-residential": { x: -58, z: 172, yaw: -0.35 },
+  "city-service": { x: 64, z: 108, yaw: 0.8 },
+  "city-supply": { x: 10, z: 181, yaw: 0.15 },
+  "city-north": { x: 0, z: 196, yaw: Math.PI },
   frontier: { x: -22, z: -156, yaw: Math.PI * 0.9 },
   "foundry-breach": { x: 448, z: -451, yaw: Math.PI * 0.7 },
   "foundry-entry": { x: 475, z: -470, yaw: Math.PI },
@@ -59,7 +63,7 @@ export class PlaytestBridge {
     this.game.world.scene.onBeforeRenderObservable.add(() => this.applyManualCameraPose());
 
     const api = {
-      version: 6,
+      version: 7,
       renderer,
       checkpoints: Object.keys(checkpoints),
       snapshot: () => this.snapshot(),
@@ -91,6 +95,7 @@ export class PlaytestBridge {
     const position = player.root.position;
     const ground = this.game.world.heightAt(position.x, position.z);
     const input = this.game.input as any;
+    const scene = this.game.world.scene;
     const interfaceOpen = document.querySelector(".journal-shell.open, .loadout-overlay.open") !== null;
     return {
       started: Boolean(this.game.started),
@@ -116,15 +121,17 @@ export class PlaytestBridge {
       questStage: this.game.quests?.save?.quest?.stage ?? null,
       labyrinth: { ...(this.game.quests?.save?.labyrinth ?? {}) },
       expedition: { ...(this.game.quests?.save?.expedition ?? {}) },
-      meshCount: this.game.world.scene.meshes.length,
-      activeMeshes: this.game.world.scene.getActiveMeshes?.().length ?? 0,
+      meshCount: scene.meshes.length,
+      activeMeshes: scene.getActiveMeshes?.().length ?? 0,
       fps: Number(this.game.world.engine.getFps?.().toFixed?.(1) ?? 0),
-      verticalSliceVersion: this.game.world.scene.metadata?.verticalSliceVersion ?? null,
-      caelusPhaseZeroVersion: this.game.world.scene.metadata?.caelusPhaseZeroVersion ?? null,
-      weaponMountInstalled: Boolean(this.game.world.scene.metadata?.weaponMountInstalled),
+      verticalSliceVersion: scene.metadata?.verticalSliceVersion ?? null,
+      caelusPhaseZeroVersion: scene.metadata?.caelusPhaseZeroVersion ?? null,
+      caelusTownPhaseOneVersion: scene.metadata?.caelusTownPhaseOneVersion ?? null,
+      caelusTownBuildingCount: scene.metadata?.caelusTownBuildingCount ?? 0,
+      weaponMountInstalled: Boolean(scene.metadata?.weaponMountInstalled),
       manualCameraLocked: this.manualCameraPose !== null,
       protectedRouteCollisionVolumesRemoved:
-        this.game.world.scene.metadata?.protectedRouteCollisionVolumesRemoved ?? 0,
+        scene.metadata?.protectedRouteCollisionVolumesRemoved ?? 0,
       runtimeErrors: [...this.errors]
     };
   }
@@ -243,11 +250,26 @@ export class PlaytestBridge {
     }).map((mesh: any) => mesh.name);
 
     const requiredMeshes = [
-      "vertical-slice-caelus-boulevard",
-      "vertical-slice-city-bodies-a",
-      "vertical-slice-city-doors",
-      "vertical-slice-city-windows",
-      "vertical-slice-market-canopies",
+      "caelus-phase1-main-street",
+      "caelus-phase1-market-lane",
+      "caelus-phase1-guild-lane",
+      "caelus-phase1-residential-loop",
+      "caelus-phase1-service-lane",
+      "caelus-phase1-town-center",
+      "caelus-phase1-market-square",
+      "caelus-phase1-guild-court",
+      "caelus-phase1-buildings-warm",
+      "caelus-phase1-buildings-sage",
+      "caelus-phase1-foundations",
+      "caelus-phase1-roofs-blue",
+      "caelus-phase1-roofs-green",
+      "caelus-phase1-doors",
+      "caelus-phase1-windows",
+      "caelus-phase1-market-wood",
+      "caelus-phase1-market-roofs",
+      "caelus-phase1-town-well",
+      "caelus-phase1-lantern-poles",
+      "caelus-phase1-lantern-runes",
       "vertical-slice-road-surface",
       "vertical-slice-route-bushes-a",
       "vertical-slice-route-rocks",
@@ -276,6 +298,19 @@ export class PlaytestBridge {
     const legacyGate = scene.getTransformNodeByName?.("caelus-gate-root");
     if (legacyGate?.isEnabled?.()) legacyCaelusMeshesEnabled.push("caelus-gate-root");
 
+    const rigidCityPrefixes = [
+      "vertical-slice-caelus-boulevard",
+      "vertical-slice-side-street-",
+      "vertical-slice-city-",
+      "vertical-slice-rowhouse-",
+      "vertical-slice-market-",
+      "vertical-slice-plaza-"
+    ];
+    const rigidCityMeshesPresent = scene.meshes.filter((mesh: any) => {
+      const name = String(mesh.name ?? "");
+      return rigidCityPrefixes.some((prefix) => name.startsWith(prefix));
+    }).map((mesh: any) => mesh.name);
+
     const unsupportedExact = new Set([
       "vertical-slice-wall-walks",
       "vertical-slice-wall-merlons",
@@ -291,21 +326,17 @@ export class PlaytestBridge {
       ) && mesh.isEnabled?.();
     }).map((mesh: any) => mesh.name);
 
-    const architecturePrefixes = [
-      "vertical-slice-city-",
-      "vertical-slice-plaster-",
-      "vertical-slice-roof-",
-      "vertical-slice-timber",
-      "vertical-slice-plaza-",
-      "vertical-slice-gate-",
-      "vertical-slice-market-",
-      "vertical-slice-banner"
-    ];
+    const architecturePrefixes = ["caelus-phase1-", "vertical-slice-gate-"];
     const transparentArchitectureMaterials = scene.materials.filter((material: any) => {
       const name = String(material.name ?? "");
       return architecturePrefixes.some((prefix) => name.startsWith(prefix))
         && (Number(material.alpha ?? 1) < 0.999 || Number(material.transparencyMode ?? 0) !== 0);
     }).map((material: any) => material.name);
+
+    const terrainSamples = [
+      [0, 34], [2, 67], [-3, 112], [-35, 119], [35, 130], [-61, 174], [25, 184]
+    ].map(([x, z]) => Number(this.game.world.heightAt(x, z).toFixed(3)));
+    const terrainRange = Math.max(...terrainSamples) - Math.min(...terrainSamples);
 
     return {
       unsupportedRibs,
@@ -313,12 +344,20 @@ export class PlaytestBridge {
       disabledRequiredMeshes: requiredMeshes.filter((name) => scene.getMeshByName?.(name) && !enabled(name)),
       terrainMaterial: scene.getMaterialByName?.("windscar-ground")?.name ?? null,
       terrainBumpTexture: scene.getMaterialByName?.("windscar-ground")?.bumpTexture?.name ?? null,
+      townTerrainSamples: terrainSamples,
+      townTerrainRange: Number(terrainRange.toFixed(3)),
       collisionBoxes: this.game.world.collisionBoxes?.length ?? 0,
       verticalSliceVersion: scene.metadata?.verticalSliceVersion ?? null,
       caelusPhaseZeroVersion: scene.metadata?.caelusPhaseZeroVersion ?? null,
+      caelusTownPhaseOneVersion: scene.metadata?.caelusTownPhaseOneVersion ?? null,
+      caelusTownBuildingCount: scene.metadata?.caelusTownBuildingCount ?? 0,
+      caelusTownDistricts: scene.metadata?.caelusTownDistricts ?? null,
+      phaseOneCitizenCount: scene.transformNodes.filter((node: any) => String(node.name ?? "").startsWith("caelus-phase1-citizen-")).length,
+      phaseOneMaterialCount: scene.materials.filter((material: any) => String(material.name ?? "").startsWith("caelus-phase1-")).length,
       weaponMountInstalled: Boolean(scene.getTransformNodeByName?.("caelus-third-person-sword-mount")),
       weaponMountParent: scene.getTransformNodeByName?.("caelus-third-person-sword-mount")?.parent?.name ?? null,
       legacyCaelusMeshesEnabled,
+      rigidCityMeshesPresent,
       unsupportedCityMeshesEnabled,
       transparentArchitectureMaterials,
       legacyCaelusCollisionVolumesRemoved: Number(scene.metadata?.legacyCaelusCollisionVolumesRemoved ?? 0),
