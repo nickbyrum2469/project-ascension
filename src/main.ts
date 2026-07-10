@@ -4,6 +4,7 @@ import { CombatFeelDirector } from "./core/CombatFeelDirector.js";
 import { FloorTwoArrivalDirector } from "./core/FloorTwoArrivalDirector.js";
 import { FrontierContractDirector } from "./core/FrontierContractDirector.js";
 import { PerformanceDirector } from "./core/PerformanceDirector.js";
+import { PlaytestBridge } from "./core/PlaytestBridge.js";
 import { VisualPolishDirector } from "./core/VisualPolishDirector.js";
 import { VisualRecoveryDirector } from "./core/VisualRecoveryDirector.js";
 import { ExpeditionJournal } from "./ui/ExpeditionJournal.js";
@@ -182,6 +183,7 @@ const boot = async (): Promise<void> => {
     consolidateFloorTwoStaticGeometry(game);
     new PerformanceDirector(engine, game.world, renderer);
     new CombatFeelDirector(game, engine);
+    new PlaytestBridge(game, renderer);
     game.run();
   } catch (error) {
     console.error(error);
