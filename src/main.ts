@@ -4,6 +4,7 @@ import * as BabylonModule from "babylonjs";
 import { RouteAudioDirector } from "./audio/RouteAudioDirector.js";
 import { CaelusPhaseZeroDirector } from "./core/CaelusPhaseZeroDirector.js";
 import { installCaelusTownPhaseOne } from "./core/CaelusTownPhaseOne.js";
+import { CaelusTownPhaseTwo } from "./core/CaelusTownPhaseTwo.js";
 import { CameraSafetyDirector } from "./core/CameraSafetyDirector.js";
 import { CombatFeelDirector } from "./core/CombatFeelDirector.js";
 import { CombatPresentationDirector } from "./core/CombatPresentationDirector.js";
@@ -194,6 +195,7 @@ const boot = async (): Promise<void> => {
     installFloorTwoSafety(game, floorTwo);
     new FrontierContractDirector(game);
     new VerticalSliceTraversalGuard(game);
+    new CaelusTownPhaseTwo(game);
     consolidateFloorTwoStaticGeometry(game);
     new PerformanceDirector(engine, game.world, renderer);
     new CombatFeelDirector(game, engine);
