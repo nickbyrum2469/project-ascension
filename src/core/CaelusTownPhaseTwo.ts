@@ -206,12 +206,10 @@ const overlaps = (left: CollisionBox, right: CollisionBox): boolean => (
 );
 
 export class CaelusTownPhaseTwo {
-  private readonly game: any;
   private readonly scene: any;
   private readonly world: any;
 
   constructor(game: any) {
-    this.game = game;
     this.scene = game.world.scene;
     this.world = game.world;
 
