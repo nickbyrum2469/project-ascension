@@ -66,7 +66,7 @@ const installAirborneCollisionGuard = async (): Promise<void> => {
     const airborneHeight = position.y;
     resolve.call(this, position, previous);
     const ground = this.heightAt(position.x, position.z);
-    if (airborneHeight > ground + 0.14) position.y = airborneHeight;
+    if (airborneHeight > ground + 0.002) position.y = airborneHeight;
   };
   prototype.__airborneCollisionGuard = true;
 };
