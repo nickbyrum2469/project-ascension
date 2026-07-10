@@ -32,6 +32,7 @@ const serializeReason = (reason: unknown): string => {
 export class PlaytestBridge {
   private readonly game: any;
   private readonly errors: string[] = [];
+  private simulatedFrames = 0;
 
   constructor(game: any, renderer: string) {
     if (!new URLSearchParams(window.location.search).has("playtest")) return;
@@ -45,7 +46,7 @@ export class PlaytestBridge {
     });
 
     const api = {
-      version: 3,
+      version: 4,
       renderer,
       checkpoints: Object.keys(checkpoints),
       snapshot: () => this.snapshot(),
@@ -54,6 +55,8 @@ export class PlaytestBridge {
       setView: (mode: CameraMode) => this.setView(mode),
       keyDown: (code: string) => this.dispatchKey("keydown", code),
       keyUp: (code: string) => this.dispatchKey("keyup", code),
+      simulate: (seconds: number, codes: string[] = []) => this.simulate(seconds, codes),
+      renderFrame: () => this.renderFrame(),
       clearInput: () => this.clearInput(),
       clearErrors: () => { this.errors.length = 0; },
       errors: () => [...this.errors],
@@ -80,6 +83,7 @@ export class PlaytestBridge {
       ascentCinematicTime: Number(this.game.ascentCinematicTime ?? 0),
       inputEnabled: Boolean(input?.enabled),
       activeKeys: Array.from(input?.keys ?? []),
+      simulatedFrames: this.simulatedFrames,
       x: Number(position.x.toFixed(3)),
       y: Number(position.y.toFixed(3)),
       z: Number(position.z.toFixed(3)),
@@ -108,6 +112,7 @@ export class PlaytestBridge {
     if (!checkpoint) throw new Error(`Unknown playtest checkpoint: ${name}`);
     this.clearInput();
     this.teleport(checkpoint.x, checkpoint.z, checkpoint.yaw);
+    this.renderFrame();
     return this.snapshot();
   }
 
@@ -141,6 +146,26 @@ export class PlaytestBridge {
       repeat: false
     });
     window.dispatchEvent(event);
+  }
+
+  private simulate(seconds: number, codes: string[]): Record<string, unknown> {
+    if (!Number.isFinite(seconds) || seconds < 0 || seconds > 20) {
+      throw new Error(`Invalid simulation duration: ${seconds}`);
+    }
+    this.clearInput();
+    codes.forEach((code) => this.dispatchKey("keydown", code));
+    const steps = Math.max(1, Math.ceil(seconds * 60));
+    for (let index = 0; index < steps; index += 1) {
+      this.game.update(1 / 60);
+      this.simulatedFrames += 1;
+    }
+    codes.forEach((code) => this.dispatchKey("keyup", code));
+    this.clearInput();
+    return this.snapshot();
+  }
+
+  private renderFrame(): void {
+    this.game.world.scene.render();
   }
 
   private clearInput(): void {
