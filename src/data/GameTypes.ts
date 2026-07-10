@@ -1,4 +1,6 @@
 export type CameraMode = "first" | "third";
+export type EnemyKind = "rift-boar" | "rift-wisp" | "foundry-sentinel";
+export type EquippedCharm = "none" | "wayfinder" | "sentinel";
 
 export interface InputFrame {
   moveX: number;
@@ -49,7 +51,15 @@ export interface ExpeditionSave {
   activatedBeacons: string[];
   claimedCaches: string[];
   riftglassShards: number;
+  fractureDust: number;
+  wispDefeats: number;
   ascentCompleted: boolean;
+}
+
+export interface EquipmentSave {
+  weaponRank: number;
+  wardRank: number;
+  equippedCharm: EquippedCharm;
 }
 
 export interface SaveData {
@@ -58,6 +68,7 @@ export interface SaveData {
   quest: QuestSave;
   labyrinth: LabyrinthSave;
   expedition: ExpeditionSave;
+  equipment: EquipmentSave;
   player: {
     health: number;
     focus: number;
@@ -69,6 +80,7 @@ export interface Damageable {
   readonly root: any;
   readonly name: string;
   readonly alive: boolean;
+  readonly kind?: EnemyKind;
   health: number;
   maxHealth: number;
   takeDamage(amount: number, impulse: any): void;
