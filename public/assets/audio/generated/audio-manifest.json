@@ -1,0 +1,88 @@
+{
+  "pack": "Project Ascension — Verdant Foundation v1",
+  "version": 1,
+  "generatedAt": "2026-07-10T05:00:06.224Z",
+  "outputFormat": "mp3_44100_128",
+  "assets": [
+    {
+      "id": "windscar-ambience",
+      "file": "./assets/audio/generated/windscar-ambience.mp3",
+      "category": "ambience",
+      "loop": true,
+      "volume": 0.42,
+      "prompt": "Seamless looping fantasy frontier ambience inside an enormous artificial world: steady high grass wind, distant resonant metal groans from colossal support pillars, faint birds, soft leaf movement, rare low sub-bass machinery pulses, spacious and immersive, no music, no voices, no sudden loud events",
+      "provider": "ElevenLabs",
+      "model": "eleven_text_to_sound_v2"
+    },
+    {
+      "id": "caelus-reach-ambience",
+      "file": "./assets/audio/generated/caelus-reach-ambience.mp3",
+      "category": "ambience",
+      "loop": true,
+      "volume": 0.4,
+      "prompt": "Seamless looping ambience for a fortified low-poly fantasy city: distant market activity, soft footsteps on stone, flags and awnings moving in wind, quiet forge hammer far away, subtle wooden signs creaking, safe inhabited atmosphere, no intelligible speech, no music",
+      "provider": "ElevenLabs",
+      "model": "eleven_text_to_sound_v2"
+    },
+    {
+      "id": "sword-light-swing",
+      "file": "./assets/audio/generated/sword-light-swing.mp3",
+      "category": "combat",
+      "loop": false,
+      "volume": 0.8,
+      "prompt": "Clean fast fantasy longsword swing, sharp controlled steel whoosh with a faint crystalline cyan energy trail, close perspective, punchy game sound effect, dry, no impact, no voice",
+      "provider": "ElevenLabs",
+      "model": "eleven_text_to_sound_v2"
+    },
+    {
+      "id": "sword-heavy-swing",
+      "file": "./assets/audio/generated/sword-heavy-swing.mp3",
+      "category": "combat",
+      "loop": false,
+      "volume": 0.86,
+      "prompt": "Powerful two-handed fantasy longsword heavy swing, deep accelerating air displacement, metallic blade resonance and restrained crystalline energy wake, weighty but not explosive, close game sound effect, no impact, no voice",
+      "provider": "ElevenLabs",
+      "model": "eleven_text_to_sound_v2"
+    },
+    {
+      "id": "riftglass-impact",
+      "file": "./assets/audio/generated/riftglass-impact.mp3",
+      "category": "combat",
+      "loop": false,
+      "volume": 0.9,
+      "prompt": "Fantasy sword striking armored hide and stone-like carapace, dense metallic thud, short crack of glassy cyan magic, small debris detail, satisfying action RPG impact, no gore, no voice",
+      "provider": "ElevenLabs",
+      "model": "eleven_text_to_sound_v2"
+    },
+    {
+      "id": "guard-clash",
+      "file": "./assets/audio/generated/guard-clash.mp3",
+      "category": "combat",
+      "loop": false,
+      "volume": 0.88,
+      "prompt": "Defensive longsword guard blocks a charging creature, hard steel clash, brief low body impact, bright ringing resonance and tiny magical spark, compact action RPG sound, no voice",
+      "provider": "ElevenLabs",
+      "model": "eleven_text_to_sound_v2"
+    },
+    {
+      "id": "rift-boar-charge",
+      "file": "./assets/audio/generated/rift-boar-charge.mp3",
+      "category": "creature",
+      "loop": false,
+      "volume": 0.82,
+      "prompt": "Large corrupted fantasy boar telegraphing a charge: low threatening snort, hoof scrape on stone and soil, rising chest growl with faint crystalline resonance, readable enemy warning cue, no human voice",
+      "provider": "ElevenLabs",
+      "model": "eleven_text_to_sound_v2"
+    },
+    {
+      "id": "quest-thread-stinger",
+      "file": "./assets/audio/generated/quest-thread-stinger.mp3",
+      "category": "ui",
+      "loop": false,
+      "volume": 0.68,
+      "prompt": "Short premium fantasy action RPG quest discovery stinger, four ascending crystalline tones, restrained low mechanical resonance underneath, elegant and mysterious, no orchestra swell, no voice",
+      "provider": "ElevenLabs",
+      "model": "eleven_text_to_sound_v2"
+    }
+  ]
+}
