@@ -14,6 +14,7 @@ const requiredFiles = [
   "src/world/RiftWispAsset.ts",
   "src/ui/Hud.ts",
   "src/ui/ExpeditionJournal.ts",
+  "src/ui/LoadoutOverlay.ts",
   "src/audio/AudioDirector.ts",
   "public/assets/asset-manifest.json",
   "public/assets/branding/ascension-mark.svg"
@@ -38,7 +39,8 @@ const sourceFiles = await Promise.all([
   "src/world/ProceduralAssets.ts",
   "src/world/RiftWispAsset.ts",
   "src/ui/Hud.ts",
-  "src/ui/ExpeditionJournal.ts"
+  "src/ui/ExpeditionJournal.ts",
+  "src/ui/LoadoutOverlay.ts"
 ].map((file) => readFile(file, "utf8")));
 const productionSource = sourceFiles.join("\n").toLowerCase();
 for (const banned of ["todo:", "replace later", "temporary asset", "placeholder asset", "navigationrect"]) {
@@ -84,11 +86,26 @@ for (const requiredFeature of [
   "data-tab=\"loadout\"",
   "western-watch",
   "aqueduct-overlook",
-  "foundry-threshold"
+  "foundry-threshold",
+  "new loadoutoverlay",
+  "project-ascension-equip-charm",
+  "setequippedcharm",
+  "canequipcharm",
+  "wayfinder thread unlocked",
+  "sentinel remnant unlocked",
+  "oran pell · riftglass attunement",
+  "data-charm",
+  "keyl",
+  "loadout-strip"
 ]) {
   if (!productionSource.includes(requiredFeature)) {
     throw new Error(`Missing required production feature: ${requiredFeature}`);
   }
+}
+
+const questSource = await readFile("src/game/QuestSystem.ts", "utf8");
+if (questSource.includes('this.save.equipment.equippedCharm = this.save.labyrinth.guardianDefeated')) {
+  throw new Error("Charm selection must not be overwritten automatically by guardian progression.");
 }
 
 const manifest = JSON.parse(await readFile("public/assets/asset-manifest.json", "utf8"));
