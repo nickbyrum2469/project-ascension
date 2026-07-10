@@ -62,9 +62,13 @@ const boot = async (): Promise<void> => {
   try {
     status && (status.textContent = "Synchronizing the Foundation lattice…");
     await installAirborneCollisionGuard();
-    const { Game } = await import("./game/Game.js");
+    const [{ Game }, { ExpeditionJournal }] = await Promise.all([
+      import("./game/Game.js"),
+      import("./ui/ExpeditionJournal.js")
+    ]);
     const { engine, renderer } = await createEngine(canvas);
     const game = new Game(engine, canvas, renderer);
+    new ExpeditionJournal();
     game.world.mara.root.position.y += 0.31;
     game.run();
   } catch (error) {
