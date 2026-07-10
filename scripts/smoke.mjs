@@ -212,9 +212,11 @@ for (const requiredVisualRule of [
   'terrain.bumpTexture = null',
   'name.startsWith("foundation-rib-")',
   'mesh.setEnabled(false)',
-  'new BABYLON.Vector3(Math.PI, 0, 0)',
+  'new BABYLON.Vector3(Math.PI / 2, 0, -0.18)',
+  'BABYLON.Vector3.Zero()',
   'directionCorrected: true',
   'collisionBoxes?.push',
+  'const z = -6 - index * 4.45',
   'spawn-trail-pavers-batch',
   'spawn-trail-verge-batch',
   'spawn-trail-markers-batch'
