@@ -39,8 +39,10 @@ jobs:
       - name: Expand reviewed source archive
         run: node bootstrap.mjs
 
-      - name: Remove bootstrap transport
-        run: rm -rf bootstrap bootstrap.mjs .github/workflows/materialize.yml
+      - name: Remove transport and defer workflow installation
+        run: |
+          rm -rf bootstrap bootstrap.mjs
+          rm -f .github/workflows/quality.yml .github/workflows/pages.yml
 
       - name: Commit expanded playable foundation
         run: |
