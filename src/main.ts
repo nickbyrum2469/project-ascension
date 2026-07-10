@@ -11,6 +11,7 @@ import { PlaytestBridge } from "./core/PlaytestBridge.js";
 import { VerticalSliceActorRebase } from "./core/VerticalSliceActorRebase.js";
 import { VerticalSliceDirector } from "./core/VerticalSliceDirector.js";
 import { installVerticalSliceRuntimeGuard } from "./core/VerticalSliceRuntimeGuard.js";
+import { VerticalSliceTraversalGuard } from "./core/VerticalSliceTraversalGuard.js";
 import { VisualRecoveryDirector } from "./core/VisualRecoveryDirector.js";
 import { ExpeditionJournal } from "./ui/ExpeditionJournal.js";
 import { LoadoutOverlay } from "./ui/LoadoutOverlay.js";
@@ -187,6 +188,7 @@ const boot = async (): Promise<void> => {
     const floorTwo = new FloorTwoArrivalDirector(game);
     installFloorTwoSafety(game, floorTwo);
     new FrontierContractDirector(game);
+    new VerticalSliceTraversalGuard(game);
     consolidateFloorTwoStaticGeometry(game);
     new PerformanceDirector(engine, game.world, renderer);
     new CombatFeelDirector(game, engine);
