@@ -7,6 +7,13 @@ interface PlaytestCheckpoint {
   yaw: number;
 }
 
+interface ManualCameraPose {
+  offsetX: number;
+  offsetY: number;
+  offsetZ: number;
+  targetY: number;
+}
+
 const checkpoints: Record<string, PlaytestCheckpoint> = {
   spawn: { x: 0, z: -2, yaw: Math.PI },
   "frontier-combat": { x: 0, z: -60, yaw: Math.PI },
@@ -37,6 +44,7 @@ export class PlaytestBridge {
   private readonly game: any;
   private readonly errors: string[] = [];
   private simulatedFrames = 0;
+  private manualCameraPose: ManualCameraPose | null = null;
 
   constructor(game: any, renderer: string) {
     if (!new URLSearchParams(window.location.search).has("playtest")) return;
@@ -48,9 +56,10 @@ export class PlaytestBridge {
     window.addEventListener("unhandledrejection", (event) => {
       this.errors.push(`Unhandled rejection: ${serializeReason(event.reason)}`);
     });
+    this.game.world.scene.onBeforeRenderObservable.add(() => this.applyManualCameraPose());
 
     const api = {
-      version: 5,
+      version: 6,
       renderer,
       checkpoints: Object.keys(checkpoints),
       snapshot: () => this.snapshot(),
@@ -61,6 +70,7 @@ export class PlaytestBridge {
       cameraPose: (offsetX: number, offsetY: number, offsetZ: number, targetY = 1.2) => (
         this.cameraPose(offsetX, offsetY, offsetZ, targetY)
       ),
+      clearCameraPose: () => this.clearCameraPose(),
       keyDown: (code: string) => this.dispatchKey("keydown", code),
       keyUp: (code: string) => this.dispatchKey("keyup", code),
       simulate: (seconds: number, codes: string[] = []) => this.simulate(seconds, codes),
@@ -112,6 +122,7 @@ export class PlaytestBridge {
       verticalSliceVersion: this.game.world.scene.metadata?.verticalSliceVersion ?? null,
       caelusPhaseZeroVersion: this.game.world.scene.metadata?.caelusPhaseZeroVersion ?? null,
       weaponMountInstalled: Boolean(this.game.world.scene.metadata?.weaponMountInstalled),
+      manualCameraLocked: this.manualCameraPose !== null,
       protectedRouteCollisionVolumesRemoved:
         this.game.world.scene.metadata?.protectedRouteCollisionVolumesRemoved ?? 0,
       runtimeErrors: [...this.errors]
@@ -121,6 +132,7 @@ export class PlaytestBridge {
   private moveToCheckpoint(name: string): Record<string, unknown> {
     const checkpoint = checkpoints[name];
     if (!checkpoint) throw new Error(`Unknown playtest checkpoint: ${name}`);
+    this.manualCameraPose = null;
     this.clearInput();
     this.teleport(checkpoint.x, checkpoint.z, checkpoint.yaw);
     return this.snapshot();
@@ -159,14 +171,26 @@ export class PlaytestBridge {
     offsetZ: number,
     targetY: number
   ): Record<string, unknown> {
+    this.manualCameraPose = { offsetX, offsetY, offsetZ, targetY };
+    this.applyManualCameraPose();
+    return this.snapshot();
+  }
+
+  private clearCameraPose(): Record<string, unknown> {
+    this.manualCameraPose = null;
+    return this.snapshot();
+  }
+
+  private applyManualCameraPose(): void {
+    const pose = this.manualCameraPose;
+    if (!pose) return;
     const playerPosition = this.game.player.root.position;
     this.game.world.camera.position.set(
-      playerPosition.x + offsetX,
-      playerPosition.y + offsetY,
-      playerPosition.z + offsetZ
+      playerPosition.x + pose.offsetX,
+      playerPosition.y + pose.offsetY,
+      playerPosition.z + pose.offsetZ
     );
-    this.game.world.camera.setTarget(playerPosition.add(new BABYLON.Vector3(0, targetY, 0)));
-    return this.snapshot();
+    this.game.world.camera.setTarget(playerPosition.add(new BABYLON.Vector3(0, pose.targetY, 0)));
   }
 
   private dispatchKey(type: KeyEventType, code: string): void {
@@ -197,6 +221,7 @@ export class PlaytestBridge {
   }
 
   private renderFrame(): void {
+    this.applyManualCameraPose();
     this.game.world.scene.render();
   }
 
@@ -254,6 +279,7 @@ export class PlaytestBridge {
     const unsupportedExact = new Set([
       "vertical-slice-wall-walks",
       "vertical-slice-wall-merlons",
+      "vertical-slice-plaza-monuments",
       "vertical-slice-pillar-collars",
       "vertical-slice-pillar-ascent-rune"
     ]);
