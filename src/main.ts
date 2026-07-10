@@ -1,11 +1,14 @@
 import "./styles.css";
+import "./combat-presentation.css";
 import * as BabylonModule from "babylonjs";
 import { CombatFeelDirector } from "./core/CombatFeelDirector.js";
+import { CombatPresentationDirector } from "./core/CombatPresentationDirector.js";
 import { FloorTwoArrivalDirector } from "./core/FloorTwoArrivalDirector.js";
 import { FrontierContractDirector } from "./core/FrontierContractDirector.js";
 import { PerformanceDirector } from "./core/PerformanceDirector.js";
 import { PlaytestBridge } from "./core/PlaytestBridge.js";
 import { VerticalSliceDirector } from "./core/VerticalSliceDirector.js";
+import { installVerticalSliceRuntimeGuard } from "./core/VerticalSliceRuntimeGuard.js";
 import { VisualRecoveryDirector } from "./core/VisualRecoveryDirector.js";
 import { ExpeditionJournal } from "./ui/ExpeditionJournal.js";
 import { LoadoutOverlay } from "./ui/LoadoutOverlay.js";
@@ -169,6 +172,7 @@ const boot = async (): Promise<void> => {
     await installAirborneCollisionGuard();
     const { Game } = await import("./game/Game.js");
     installInterfacePauseGuard(Game);
+    installVerticalSliceRuntimeGuard(VerticalSliceDirector);
     const { engine, renderer } = await createEngine(canvas);
     const game = new Game(engine, canvas, renderer);
     new ExpeditionJournal();
@@ -183,6 +187,7 @@ const boot = async (): Promise<void> => {
     consolidateFloorTwoStaticGeometry(game);
     new PerformanceDirector(engine, game.world, renderer);
     new CombatFeelDirector(game, engine);
+    new CombatPresentationDirector(game);
     new PlaytestBridge(game, renderer);
     game.run();
   } catch (error) {
