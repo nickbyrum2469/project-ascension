@@ -23,6 +23,7 @@ interface Snapshot {
   verticalSliceVersion: number | null;
   caelusPhaseZeroVersion: number | null;
   weaponMountInstalled: boolean;
+  manualCameraLocked: boolean;
   protectedRouteCollisionVolumesRemoved: number;
   runtimeErrors: string[];
 }
@@ -95,6 +96,7 @@ test("production vertical slice remains traversable and visually auditable", asy
   expect(start.verticalSliceVersion).toBe(2);
   expect(start.caelusPhaseZeroVersion).toBe(1);
   expect(start.weaponMountInstalled).toBe(true);
+  expect(start.manualCameraLocked).toBe(false);
 
   await bridgeCall(page, "keyDown", "KeyW");
   const heldInput = await bridgeCall<Snapshot>(page, "snapshot");
@@ -118,10 +120,14 @@ test("production vertical slice remains traversable and visually auditable", asy
   expect(combatReady.grounded).toBe(true);
 
   await bridgeCall(page, "setPaused", true);
-  await bridgeCall(page, "cameraPose", 4.25, 1.85, 0, 1.25);
+  const rightProfile = await bridgeCall<Snapshot>(page, "cameraPose", 4.25, 1.85, 0, 1.25);
+  expect(rightProfile.manualCameraLocked).toBe(true);
   await capture(page, testInfo, "weapon-idle-right-profile");
-  await bridgeCall(page, "cameraPose", -4.25, 1.85, 0, 1.25);
+  const leftProfile = await bridgeCall<Snapshot>(page, "cameraPose", -4.25, 1.85, 0, 1.25);
+  expect(leftProfile.manualCameraLocked).toBe(true);
   await capture(page, testInfo, "weapon-idle-left-profile");
+  const cameraReleased = await bridgeCall<Snapshot>(page, "clearCameraPose");
+  expect(cameraReleased.manualCameraLocked).toBe(false);
   await bridgeCall(page, "setPaused", false);
   await simulate(page, 0.1);
 
