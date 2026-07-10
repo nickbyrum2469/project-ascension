@@ -33,24 +33,35 @@ const sourceFiles = await Promise.all([
   "src/game/RiftBoar.ts",
   "src/world/World.ts",
   "src/world/FoundryLabyrinth.ts",
+  "src/world/ProceduralAssets.ts",
   "src/ui/Hud.ts"
 ].map((file) => readFile(file, "utf8")));
 const productionSource = sourceFiles.join("\n").toLowerCase();
-for (const banned of ["todo:", "replace later", "temporary asset", "placeholder asset"]) {
+for (const banned of ["todo:", "replace later", "temporary asset", "placeholder asset", "navigationrect"]) {
   if (productionSource.includes(banned)) throw new Error(`Production source contains banned marker: ${banned}`);
 }
 
 for (const requiredFeature of [
   "foundrylabyrinth",
   "sigilsactivated",
-  "guardianDefeated".toLowerCase(),
+  "sentineldefeated",
   "foundry sentinel",
   "slam",
   "restorecore",
-  "shortcutopened"
+  "shortcutopened",
+  "createterrainribbon",
+  "samplecatmullrom",
+  "resolveplayerposition",
+  "rightforearm",
+  "leftshin",
+  "connectedweapon",
+  "animatefirstpersonattack",
+  "animatefirstpersonguard",
+  "resolvevisiblegates",
+  "foundation-rib-collar"
 ]) {
   if (!productionSource.includes(requiredFeature)) {
-    throw new Error(`Missing required labyrinth progression feature: ${requiredFeature}`);
+    throw new Error(`Missing required reconstruction feature: ${requiredFeature}`);
   }
 }
 
@@ -64,4 +75,4 @@ for (const asset of manifest.assets) {
   }
 }
 
-console.log("Project Ascension smoke checks passed.");
+console.log("Project Ascension reconstruction smoke checks passed.");
