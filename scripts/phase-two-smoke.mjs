@@ -34,11 +34,13 @@ for (const feature of [
   "phaseTwoWellRecovered",
   "phaseTwoDrainageBands",
   "phaseTwoCollisionAudit",
-  "caelus-phase2-main-street-curb-left",
-  "caelus-phase2-market-lane-channel-right",
-  "caelus-phase2-guild-lane-curb-left",
-  "caelus-phase2-residential-loop-channel-right",
-  "caelus-phase2-service-lane-curb-left",
+  'id: "main-street"',
+  'id: "market-lane"',
+  'id: "guild-lane"',
+  'id: "residential-loop"',
+  'id: "service-lane"',
+  "`caelus-phase2-${definition.id}-curb-${",
+  "`caelus-phase2-${definition.id}-channel-${",
   "collisionCenter: { x: -10, z: 112 }",
   "duplicatePairs",
   "mainRouteIntrusions",
@@ -53,7 +55,9 @@ for (const feature of [
   "missingDrainageMeshes",
   "transparentPhaseTwoMaterials",
   "wellRootOffsetX",
-  "roadMaterialFrozen"
+  "roadMaterialFrozen",
+  '"caelus-phase2-main-street-curb-left"',
+  '"caelus-phase2-service-lane-channel-right"'
 ]) {
   if (!extension.includes(feature)) throw new Error(`Missing Phase Two playtest feature: ${feature}`);
 }
