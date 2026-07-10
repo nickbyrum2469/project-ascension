@@ -8,6 +8,13 @@ on:
       - "bootstrap/**"
       - "bootstrap.mjs"
       - ".github/workflows/materialize.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "bootstrap/**"
+      - "bootstrap.mjs"
+      - ".github/workflows/materialize.yml"
   workflow_dispatch:
 
 permissions:
@@ -15,7 +22,7 @@ permissions:
 
 jobs:
   materialize:
-    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[materialized]')
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[materialized]')
     runs-on: ubuntu-latest
     steps:
       - name: Check out foundation branch
