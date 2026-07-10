@@ -1,6 +1,7 @@
 import "./styles.css";
 import * as BabylonModule from "babylonjs";
 import { ExpeditionJournal } from "./ui/ExpeditionJournal.js";
+import { LoadoutOverlay } from "./ui/LoadoutOverlay.js";
 
 (globalThis as typeof globalThis & { BABYLON: typeof BabylonModule }).BABYLON = BabylonModule;
 
@@ -67,6 +68,7 @@ const boot = async (): Promise<void> => {
     const { engine, renderer } = await createEngine(canvas);
     const game = new Game(engine, canvas, renderer);
     new ExpeditionJournal();
+    new LoadoutOverlay();
     game.world.mara.root.position.y += 0.31;
     game.run();
   } catch (error) {
