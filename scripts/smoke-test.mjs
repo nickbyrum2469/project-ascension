@@ -52,6 +52,7 @@ for (const requiredFeature of [
   "createterrainribbon",
   "samplecatmullrom",
   "resolveplayerposition",
+  "airbornecollisionguard",
   "rightforearm",
   "leftshin",
   "connectedweapon",
