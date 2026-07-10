@@ -231,10 +231,11 @@ for (const requiredWorkflowRule of [
 
 const browserTest = await readFile("tests/browser/vertical-slice.spec.mts", "utf8");
 for (const requiredBrowserRule of [
-  'page.keyboard.down("KeyW")',
-  'page.keyboard.press("Space")',
-  'page.keyboard.press("KeyQ")',
-  'page.keyboard.press("KeyV")',
+  'keyDown(page, "KeyW")',
+  'tapKey(page, "Space")',
+  'tapKey(page, "KeyQ")',
+  'tapKey(page, "KeyV")',
+  'expect(heldInput.activeKeys).toContain("KeyW")',
   'bridgeCall<GeometryAudit>(page, "geometryAudit")',
   '"foundry-core"',
   '"pillar-lift"',
