@@ -56,6 +56,12 @@ interface GeometryAudit {
   protectedRouteCollisionVolumesRemoved: number;
 }
 
+interface EvidenceView {
+  name: string;
+  checkpoint?: string;
+  position?: [number, number, number];
+}
+
 const bridgeCall = async <T>(page: Page, method: string, ...args: unknown[]): Promise<T> => page.evaluate(
   ({ methodName, values }) => {
     const bridge = (globalThis as any).__ASCENSION_PLAYTEST__;
@@ -73,10 +79,22 @@ const simulate = async (page: Page, seconds: number, codes: string[] = []): Prom
 
 const capture = async (page: Page, testInfo: TestInfo, name: string): Promise<void> => {
   await bridgeCall(page, "renderFrame");
-  await page.waitForTimeout(75);
+  await page.waitForTimeout(25);
+  const canvas = page.locator("#render-canvas");
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error("Render canvas has no screenshot bounds.");
   const path = testInfo.outputPath("visual", `${name}.png`);
   await mkdir(dirname(path), { recursive: true });
-  await page.locator("#render-canvas").screenshot({ path });
+  await page.screenshot({
+    path,
+    animations: "disabled",
+    clip: {
+      x: box.x,
+      y: box.y,
+      width: box.width,
+      height: box.height
+    }
+  });
 };
 
 test("production vertical slice and organic Caelus town remain traversable and auditable", async ({ page }, testInfo) => {
@@ -211,26 +229,38 @@ test("production vertical slice and organic Caelus town remain traversable and a
   await mkdir(dirname(auditPath), { recursive: true });
   await writeFile(auditPath, JSON.stringify({ start, audit }, null, 2));
 
-  const views = [
-    "spawn",
-    "gate-exterior",
-    "gate-interior",
-    "city-main-south",
-    "city-market",
-    "city-center",
-    "city-guild",
-    "city-residential",
-    "city-service",
-    "city-supply",
-    "city-north",
-    "frontier",
-    "foundry-breach"
+  const views: EvidenceView[] = [
+    { name: "spawn", checkpoint: "spawn" },
+    { name: "gate-exterior", checkpoint: "gate-exterior" },
+    { name: "gate-interior", checkpoint: "gate-interior" },
+    { name: "city-main-south", position: [2, 67, 0] },
+    { name: "city-market", position: [-18, 119, -Math.PI / 2] },
+    { name: "city-center", position: [8, 112, -Math.PI / 2] },
+    { name: "city-guild", position: [20, 130, Math.PI / 2] },
+    { name: "city-residential", position: [-35, 174, -Math.PI / 2] },
+    { name: "city-service", position: [48, 110, Math.PI / 2] },
+    { name: "city-supply", position: [4, 184, Math.PI / 2] },
+    { name: "city-north", checkpoint: "city-north" },
+    { name: "frontier", checkpoint: "frontier" },
+    { name: "foundry-breach", checkpoint: "foundry-breach" }
   ];
   for (const view of views) {
-    await bridgeCall(page, "checkpoint", view);
-    await simulate(page, 0.2);
-    await capture(page, testInfo, view);
+    if (view.checkpoint) {
+      await bridgeCall(page, "checkpoint", view.checkpoint);
+    } else if (view.position) {
+      await bridgeCall(page, "teleport", ...view.position);
+    }
+    await simulate(page, 0.12);
+    await capture(page, testInfo, view.name);
   }
+
+  await bridgeCall(page, "checkpoint", "city-center");
+  await bridgeCall(page, "setPaused", true);
+  const overviewLocked = await bridgeCall<Snapshot>(page, "cameraPose", 0, 55, -45, 1.2);
+  expect(overviewLocked.manualCameraLocked).toBe(true);
+  await capture(page, testInfo, "city-overview");
+  await bridgeCall(page, "clearCameraPose");
+  await bridgeCall(page, "setPaused", false);
 
   await bridgeCall(page, "unlockVerticalSlice");
   await bridgeCall(page, "checkpoint", "foundry-breach");
@@ -240,7 +270,7 @@ test("production vertical slice and organic Caelus town remain traversable and a
 
   for (const view of ["foundry-entry", "foundry-core", "pillar-lift"]) {
     await bridgeCall(page, "checkpoint", view);
-    await simulate(page, 0.2);
+    await simulate(page, 0.12);
     await capture(page, testInfo, view);
   }
 
