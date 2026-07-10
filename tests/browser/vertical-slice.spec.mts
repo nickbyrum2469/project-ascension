@@ -22,6 +22,8 @@ interface Snapshot {
   fps: number;
   verticalSliceVersion: number | null;
   caelusPhaseZeroVersion: number | null;
+  caelusTownPhaseOneVersion: number | null;
+  caelusTownBuildingCount: number;
   weaponMountInstalled: boolean;
   manualCameraLocked: boolean;
   protectedRouteCollisionVolumesRemoved: number;
@@ -33,16 +35,23 @@ interface GeometryAudit {
   missingRequiredMeshes: string[];
   disabledRequiredMeshes: string[];
   terrainBumpTexture: string | null;
+  townTerrainSamples: number[];
+  townTerrainRange: number;
   collisionBoxes: number;
   verticalSliceVersion: number | null;
   caelusPhaseZeroVersion: number | null;
+  caelusTownPhaseOneVersion: number | null;
+  caelusTownBuildingCount: number;
+  caelusTownDistricts: Record<string, { x: number; z: number }> | null;
+  phaseOneCitizenCount: number;
+  phaseOneMaterialCount: number;
   weaponMountInstalled: boolean;
   weaponMountParent: string | null;
   legacyCaelusMeshesEnabled: string[];
+  rigidCityMeshesPresent: string[];
   unsupportedCityMeshesEnabled: string[];
   transparentArchitectureMaterials: string[];
   legacyCaelusCollisionVolumesRemoved: number;
-  opaqueArchitectureMaterials: number;
   dynamicActorsRebased: boolean;
   protectedRouteCollisionVolumesRemoved: number;
 }
@@ -70,7 +79,7 @@ const capture = async (page: Page, testInfo: TestInfo, name: string): Promise<vo
   await page.locator("#render-canvas").screenshot({ path });
 };
 
-test("production vertical slice remains traversable and visually auditable", async ({ page }, testInfo) => {
+test("production vertical slice and organic Caelus town remain traversable and auditable", async ({ page }, testInfo) => {
   const consoleErrors: string[] = [];
   page.on("pageerror", (error) => consoleErrors.push(`pageerror: ${error.message}`));
   page.on("console", (message) => {
@@ -95,6 +104,8 @@ test("production vertical slice remains traversable and visually auditable", asy
   expect(start.cameraMode).toBe("third");
   expect(start.verticalSliceVersion).toBe(2);
   expect(start.caelusPhaseZeroVersion).toBe(1);
+  expect(start.caelusTownPhaseOneVersion).toBe(1);
+  expect(start.caelusTownBuildingCount).toBe(18);
   expect(start.weaponMountInstalled).toBe(true);
   expect(start.manualCameraLocked).toBe(false);
 
@@ -153,25 +164,50 @@ test("production vertical slice remains traversable and visually auditable", asy
   const throughGate = await simulate(page, 4.5, ["ShiftLeft", "KeyW"]);
   expect(throughGate.z).toBeGreaterThan(27);
 
+  await bridgeCall(page, "checkpoint", "gate-interior");
+  const mainStreetWalk = await simulate(page, 4.2, ["ShiftLeft", "KeyW"]);
+  expect(mainStreetWalk.z).toBeGreaterThan(58);
+
+  await bridgeCall(page, "teleport", -4, 101, -1.15);
+  const marketLaneWalk = await simulate(page, 2.5, ["KeyW"]);
+  expect(marketLaneWalk.x).toBeLessThan(-10);
+  expect(marketLaneWalk.z).toBeGreaterThan(102);
+
+  await bridgeCall(page, "teleport", 4, 103, 1.12);
+  const guildLaneWalk = await simulate(page, 2.5, ["KeyW"]);
+  expect(guildLaneWalk.x).toBeGreaterThan(10);
+  expect(guildLaneWalk.z).toBeGreaterThan(104);
+
   const audit = await bridgeCall<GeometryAudit>(page, "geometryAudit");
   expect(audit.unsupportedRibs).toEqual([]);
   expect(audit.missingRequiredMeshes).toEqual([]);
   expect(audit.disabledRequiredMeshes).toEqual([]);
   expect(audit.terrainBumpTexture).toBeNull();
-  expect(audit.collisionBoxes).toBeGreaterThan(20);
+  expect(audit.townTerrainSamples).toHaveLength(7);
+  expect(audit.townTerrainRange).toBeGreaterThan(0.45);
+  expect(audit.townTerrainRange).toBeLessThan(2.2);
+  expect(audit.collisionBoxes).toBeGreaterThan(25);
   expect(audit.verticalSliceVersion).toBe(2);
   expect(audit.caelusPhaseZeroVersion).toBe(1);
+  expect(audit.caelusTownPhaseOneVersion).toBe(1);
+  expect(audit.caelusTownBuildingCount).toBe(18);
+  expect(audit.caelusTownDistricts).not.toBeNull();
+  expect(Object.keys(audit.caelusTownDistricts ?? {})).toEqual(expect.arrayContaining([
+    "gate", "mainStreet", "townCenter", "market", "guild", "residential", "service", "supply"
+  ]));
+  expect(audit.phaseOneCitizenCount).toBe(5);
+  expect(audit.phaseOneMaterialCount).toBeGreaterThanOrEqual(13);
   expect(audit.weaponMountInstalled).toBe(true);
   expect(audit.weaponMountParent).toBe("warden-right-hand");
   expect(audit.legacyCaelusMeshesEnabled).toEqual([]);
+  expect(audit.rigidCityMeshesPresent).toEqual([]);
   expect(audit.unsupportedCityMeshesEnabled).toEqual([]);
   expect(audit.transparentArchitectureMaterials).toEqual([]);
   expect(audit.legacyCaelusCollisionVolumesRemoved).toBe(5);
-  expect(audit.opaqueArchitectureMaterials).toBeGreaterThanOrEqual(10);
   expect(audit.dynamicActorsRebased).toBe(true);
   expect(audit.protectedRouteCollisionVolumesRemoved).toBeGreaterThan(0);
 
-  const auditPath = testInfo.outputPath("caelus-phase-zero-audit.json");
+  const auditPath = testInfo.outputPath("caelus-phase-one-audit.json");
   await mkdir(dirname(auditPath), { recursive: true });
   await writeFile(auditPath, JSON.stringify({ start, audit }, null, 2));
 
@@ -179,9 +215,13 @@ test("production vertical slice remains traversable and visually auditable", asy
     "spawn",
     "gate-exterior",
     "gate-interior",
-    "city-boulevard",
+    "city-main-south",
     "city-market",
-    "city-plaza",
+    "city-center",
+    "city-guild",
+    "city-residential",
+    "city-service",
+    "city-supply",
     "city-north",
     "frontier",
     "foundry-breach"
