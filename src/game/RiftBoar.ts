@@ -35,7 +35,7 @@ export class RiftBoar implements Damageable {
     private readonly onPlayerDamage: (amount: number, source: any) => void,
     private readonly onImpact: (position: any, heavy: boolean) => void
   ) {
-    this.isGuardian = index >= 5;
+    this.isGuardian = index === 4;
     this.name = this.isGuardian ? "Foundry Sentinel" : "Rift Boar";
     this.maxHealth = this.isGuardian ? 480 : 80;
     this.health = this.maxHealth;
@@ -44,6 +44,11 @@ export class RiftBoar implements Damageable {
     this.visual = createRiftBoar(world.scene, index);
     this.root = this.visual.root;
     this.root.position.copyFrom(position);
+    if (this.isGuardian) {
+      const guardianX = world.labyrinthPosition.x;
+      const guardianZ = world.labyrinthPosition.z - 76;
+      this.root.position.copyFrom(new BABYLON.Vector3(guardianX, world.heightAt(guardianX, guardianZ), guardianZ));
+    }
     this.root.rotation.y = index * 1.7;
     this.root.getChildMeshes().forEach((mesh: any) => world.shadowGenerator.addShadowCaster(mesh));
     this.patrolHeading = this.root.rotation.y;
