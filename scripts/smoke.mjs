@@ -5,6 +5,7 @@ const requiredFiles = [
   "index.html",
   "src/main.ts",
   "src/core/CombatFeelDirector.ts",
+  "src/core/FloorTwoArrivalDirector.ts",
   "src/core/PerformanceDirector.ts",
   "src/game/Game.ts",
   "src/game/Player.ts",
@@ -31,6 +32,7 @@ for (const id of ids) {
 const sourceFiles = await Promise.all([
   "src/main.ts",
   "src/core/CombatFeelDirector.ts",
+  "src/core/FloorTwoArrivalDirector.ts",
   "src/core/PerformanceDirector.ts",
   "src/data/GameTypes.ts",
   "src/game/Game.ts",
@@ -87,11 +89,30 @@ for (const requiredFeature of [
   "confirmhit",
   "hitstop",
   "combat-damage-number",
-  "updateDamageLabels".toLowerCase(),
+  "updatedamagelabels",
   "startstagger",
   "combat-combo",
   "detectguardimpact",
-  "updatecamerapunch"
+  "updatecamerapunch",
+  "new floortwoarrivaldirector",
+  "floor-two-arrival-terrace",
+  "floor-two-survey-console",
+  "floor-two-threshold-fragment",
+  "floor-two-return-console",
+  "floor-two-rift-shear",
+  "installmovementsurface",
+  "this.game.finishascentcycle",
+  "floortwosurveyed",
+  "descend to the foundry core",
+  "no loading boundary",
+  "pillar descent complete",
+  "the aerial scar",
+  "installfloortwosafety",
+  "state.upperactive && game.player.root.position.y < state.upperfloory - 18",
+  "cameracollision: true",
+  "consolidatefloortwostaticgeometry",
+  "batched-floor-two-",
+  "batched ${sourcecount} floor two static meshes"
 ]) {
   if (!productionSource.includes(requiredFeature)) {
     throw new Error(`Missing required production feature: ${requiredFeature}`);
@@ -109,6 +130,49 @@ if (!combatSource.includes("copyFrom(pulse.originalScaling)")) {
   throw new Error("Enemy stagger feedback must restore the original enemy scale.");
 }
 
+const floorTwoSource = await readFile("src/core/FloorTwoArrivalDirector.ts", "utf8");
+if (!floorTwoSource.includes("this.upperActive && this.resolvingPlayer")) {
+  throw new Error("Upper-floor height must only override terrain while resolving the player.");
+}
+if (!floorTwoSource.includes("this.originalHeightAt(x, z)")) {
+  throw new Error("Floor One terrain must remain available outside the upper staging zone.");
+}
+if (!floorTwoSource.includes('claimCache("floor-two-threshold-fragment")')) {
+  throw new Error("Threshold-fragment recovery must use persistent expedition cache progression.");
+}
+const updateStart = floorTwoSource.indexOf("private update(): void");
+const updateEnd = floorTwoSource.indexOf("private refreshObjective", updateStart);
+const updateBody = floorTwoSource.slice(updateStart, updateEnd);
+for (const forbiddenRuntimeAllocation of ["MeshBuilder.Create", "new BABYLON.PBRMaterial", "new BABYLON.StandardMaterial"]) {
+  if (updateBody.includes(forbiddenRuntimeAllocation)) {
+    throw new Error(`Floor Two update loop contains expensive runtime allocation: ${forbiddenRuntimeAllocation}`);
+  }
+}
+
+const mainSource = await readFile("src/main.ts", "utf8");
+const arrivalIndex = mainSource.indexOf("new FloorTwoArrivalDirector(game)");
+const safetyIndex = mainSource.indexOf("installFloorTwoSafety(game, floorTwo)");
+const batchIndex = mainSource.indexOf("consolidateFloorTwoStaticGeometry(game)");
+const performanceIndex = mainSource.indexOf("new PerformanceDirector(engine, game.world, renderer)");
+if (arrivalIndex < 0 || safetyIndex <= arrivalIndex) {
+  throw new Error("Floor Two safety must wrap the player after the arrival director installs its upper movement surface.");
+}
+if (batchIndex <= safetyIndex || performanceIndex <= batchIndex) {
+  throw new Error("Floor Two static batching must occur after collision metadata and before the global performance director.");
+}
+if (!mainSource.includes('name === "floor-two-arrival-terrace"') || !mainSource.includes('name.includes("-rail-")')) {
+  throw new Error("Visible Floor Two floor and rail geometry must participate in camera collision.");
+}
+for (const dynamicName of [
+  '"floor-two-rift-shear"',
+  '"floor-two-threshold-fragment"',
+  '"floor-two-survey-lens"'
+]) {
+  if (!mainSource.includes(dynamicName)) {
+    throw new Error(`Floor Two batching must preserve dynamic mesh family: ${dynamicName}`);
+  }
+}
+
 const manifest = JSON.parse(await readFile("public/assets/asset-manifest.json", "utf8"));
 if (!Array.isArray(manifest.assets) || manifest.assets.length < 3) {
   throw new Error("Asset manifest is incomplete.");
@@ -119,4 +183,4 @@ for (const asset of manifest.assets) {
   }
 }
 
-console.log("Project Ascension combat-feel production checks passed.");
+console.log("Project Ascension Floor Two arrival production checks passed.");
