@@ -190,9 +190,9 @@ export class VisualPolishDirector {
   private unlitMaterial(name: string, hex: string): any {
     const material = new BABYLON.StandardMaterial(name, this.scene);
     material.disableLighting = true;
-    material.diffuseColor = BABYLON.Color3.FromHexString(hex);
+    material.diffuseColor = BABYLON.Color3.Black();
     material.specularColor = BABYLON.Color3.Black();
-    material.emissiveColor = BABYLON.Color3.Black();
+    material.emissiveColor = BABYLON.Color3.FromHexString(hex);
     material.freeze();
     return material;
   }
