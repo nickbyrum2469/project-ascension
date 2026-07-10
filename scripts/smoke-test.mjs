@@ -113,7 +113,12 @@ for (const requiredFeature of [
   "updatedistanceculling",
   "skippointermovepicking",
   "bloomscale",
-  "freezeworldmatrix"
+  "freezeworldmatrix",
+  "applyemergencygpubudget",
+  "shadowmap.resize(1024)",
+  "antialias: false",
+  "new babylon.engine(canvas, false",
+  "dust.emitrate"
 ]) {
   if (!productionSource.includes(requiredFeature)) {
     throw new Error(`Missing required production feature: ${requiredFeature}`);
@@ -134,6 +139,11 @@ for (const forbiddenRegression of [
   if (performanceSource.includes(forbiddenRegression)) {
     throw new Error(`Performance recovery regressed to an expensive setting: ${forbiddenRegression}`);
   }
+}
+
+const mainSource = await readFile("src/main.ts", "utf8");
+if (mainSource.includes("new BABYLON.Engine(canvas, true")) {
+  throw new Error("Engine-level antialiasing must remain disabled while FXAA is active.");
 }
 
 const manifest = JSON.parse(await readFile("public/assets/asset-manifest.json", "utf8"));
