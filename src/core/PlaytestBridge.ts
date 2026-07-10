@@ -12,7 +12,7 @@ const checkpoints: Record<string, PlaytestCheckpoint> = {
   "city-boulevard": { x: 0, z: 74, yaw: 0 },
   "city-plaza": { x: 0, z: 112, yaw: 0 },
   frontier: { x: -22, z: -156, yaw: Math.PI * 0.9 },
-  "foundry-breach": { x: 448, z: -451, yaw: Math.PI * 0.84 },
+  "foundry-breach": { x: 448, z: -451, yaw: Math.PI * 0.7 },
   "foundry-entry": { x: 475, z: -470, yaw: Math.PI },
   "foundry-core": { x: 475, z: -592, yaw: Math.PI },
   "pillar-lift": { x: 475, z: -606, yaw: Math.PI }
