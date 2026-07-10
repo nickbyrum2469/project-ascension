@@ -6,6 +6,7 @@ const requiredFiles = [
   "src/main.ts",
   "src/core/CombatFeelDirector.ts",
   "src/core/FloorTwoArrivalDirector.ts",
+  "src/core/FrontierContractDirector.ts",
   "src/core/PerformanceDirector.ts",
   "src/game/Game.ts",
   "src/game/Player.ts",
@@ -33,6 +34,7 @@ const sourceFiles = await Promise.all([
   "src/main.ts",
   "src/core/CombatFeelDirector.ts",
   "src/core/FloorTwoArrivalDirector.ts",
+  "src/core/FrontierContractDirector.ts",
   "src/core/PerformanceDirector.ts",
   "src/data/GameTypes.ts",
   "src/game/Game.ts",
@@ -112,7 +114,22 @@ for (const requiredFeature of [
   "cameracollision: true",
   "consolidatefloortwostaticgeometry",
   "batched-floor-two-",
-  "batched ${sourcecount} floor two static meshes"
+  "batched ${sourcecount} floor two static meshes",
+  "new frontiercontractdirector",
+  "caelus-frontier-contract-board",
+  "review caelus frontier contracts",
+  "rift herd control",
+  "wisp suppression",
+  "foundation survey",
+  "boar-control",
+  "wisp-suppression",
+  "foundation-survey",
+  "contract reward attuned",
+  "frontier-contract-tracker",
+  "this.quests.recordenemydefeat =",
+  "this.quests.activatebeacon =",
+  "this.quests.claimcache =",
+  "expedition.contracts = state"
 ]) {
   if (!productionSource.includes(requiredFeature)) {
     throw new Error(`Missing required production feature: ${requiredFeature}`);
@@ -149,16 +166,46 @@ for (const forbiddenRuntimeAllocation of ["MeshBuilder.Create", "new BABYLON.PBR
   }
 }
 
+const contractSource = await readFile("src/core/FrontierContractDirector.ts", "utf8");
+for (const requiredContractRule of [
+  "record.progress = Math.min(target, record.progress + 1)",
+  "record.completions += 1",
+  "record.progress = 0",
+  "record.active = false",
+  "fractureDust += 4",
+  "fractureDust += 6",
+  "riftglassShards += 1",
+  "riftglassShards += 2",
+  "recalculateEquipment?.(true)",
+  "collisionBoxes?.push",
+  "cameraCollision: true",
+  "snapshot === this.lastTrackerSnapshot"
+]) {
+  if (!contractSource.includes(requiredContractRule)) {
+    throw new Error(`Missing frontier contract rule: ${requiredContractRule}`);
+  }
+}
+if (contractSource.includes("onBeforeRenderObservable")) {
+  throw new Error("Frontier contracts must remain event-driven rather than adding another frame callback.");
+}
+if (!contractSource.includes("recordEnemyDefeat(kind);\n      this.recordEnemyProgress(kind);")) {
+  throw new Error("Contract kill progress must run after the canonical enemy reward method.");
+}
+if (!contractSource.includes("if (claimed && !id.startsWith(\"contract-reward-\"))")) {
+  throw new Error("Survey progress must ignore synthetic contract reward cache identifiers.");
+}
+
 const mainSource = await readFile("src/main.ts", "utf8");
 const arrivalIndex = mainSource.indexOf("new FloorTwoArrivalDirector(game)");
 const safetyIndex = mainSource.indexOf("installFloorTwoSafety(game, floorTwo)");
+const contractIndex = mainSource.indexOf("new FrontierContractDirector(game)");
 const batchIndex = mainSource.indexOf("consolidateFloorTwoStaticGeometry(game)");
 const performanceIndex = mainSource.indexOf("new PerformanceDirector(engine, game.world, renderer)");
 if (arrivalIndex < 0 || safetyIndex <= arrivalIndex) {
   throw new Error("Floor Two safety must wrap the player after the arrival director installs its upper movement surface.");
 }
-if (batchIndex <= safetyIndex || performanceIndex <= batchIndex) {
-  throw new Error("Floor Two static batching must occur after collision metadata and before the global performance director.");
+if (contractIndex <= safetyIndex || batchIndex <= contractIndex || performanceIndex <= batchIndex) {
+  throw new Error("Contract interaction must wrap Floor Two before batching and global performance initialization.");
 }
 if (!mainSource.includes('name === "floor-two-arrival-terrace"') || !mainSource.includes('name.includes("-rail-")')) {
   throw new Error("Visible Floor Two floor and rail geometry must participate in camera collision.");
@@ -183,4 +230,4 @@ for (const asset of manifest.assets) {
   }
 }
 
-console.log("Project Ascension Floor Two arrival production checks passed.");
+console.log("Project Ascension frontier contract production checks passed.");
