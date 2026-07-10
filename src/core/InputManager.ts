@@ -6,6 +6,8 @@ const clampStick = (value: number, deadZone = 0.16): number => {
   return Math.sign(value) * Math.min(1, normalized);
 };
 
+const clampAxis = (value: number): number => Math.max(-1, Math.min(1, value));
+
 export class InputManager {
   private readonly keys = new Set<string>();
   private readonly pressed = new Set<string>();
@@ -53,8 +55,10 @@ export class InputManager {
 
     const keyboardMoveX = Number(this.keys.has("KeyD")) - Number(this.keys.has("KeyA"));
     const keyboardMoveY = Number(this.keys.has("KeyW")) - Number(this.keys.has("KeyS"));
-    const moveX = gamepad ? clampStick(gamepad.axes[0] ?? 0) : keyboardMoveX;
-    const moveY = gamepad ? -clampStick(gamepad.axes[1] ?? 0) : keyboardMoveY;
+    const gamepadMoveX = gamepad ? clampStick(gamepad.axes[0] ?? 0) : 0;
+    const gamepadMoveY = gamepad ? -clampStick(gamepad.axes[1] ?? 0) : 0;
+    const moveX = clampAxis(keyboardMoveX + gamepadMoveX);
+    const moveY = clampAxis(keyboardMoveY + gamepadMoveY);
     const lookX = this.mouseX + (gamepad ? clampStick(gamepad.axes[2] ?? 0, 0.12) * 11 : 0);
     const lookY = this.mouseY + (gamepad ? clampStick(gamepad.axes[3] ?? 0, 0.12) * 11 : 0);
 
