@@ -11,6 +11,7 @@ const requiredFiles = [
   "src/core/VerticalSliceActorRebase.ts",
   "src/core/VerticalSliceTraversalGuard.ts",
   "src/core/CaelusPhaseZeroDirector.ts",
+  "src/core/CaelusTownPhaseOne.ts",
   "src/core/CombatPresentationDirector.ts",
   "src/audio/RouteAudioDirector.ts",
   "src/combat-presentation.css",
@@ -50,6 +51,7 @@ const sourceFiles = await Promise.all([
   "src/core/VerticalSliceActorRebase.ts",
   "src/core/VerticalSliceTraversalGuard.ts",
   "src/core/CaelusPhaseZeroDirector.ts",
+  "src/core/CaelusTownPhaseOne.ts",
   "src/core/CombatPresentationDirector.ts",
   "src/audio/RouteAudioDirector.ts",
   "src/game/Game.ts",
@@ -146,9 +148,6 @@ for (const requiredFeature of [
   "this.game.update(1 / 60)",
   "verticalsliceversion: 2",
   "sculptedheightat",
-  "vertical-slice-caelus-boulevard",
-  "vertical-slice-city-bodies-a",
-  "vertical-slice-market-canopies",
   "vertical-slice-road-surface",
   "vertical-slice-route-bushes-a",
   "vertical-slice-foundry-cliff-wall",
@@ -165,6 +164,22 @@ for (const requiredFeature of [
   "caelus-third-person-sword-mount",
   "legacycaeluscollisionvolumesremoved",
   "transparentarchitecturematerials",
+  "installcaelustownphaseone",
+  "caelustownphaseoneversion: 1",
+  "caelus-phase1-main-street",
+  "caelus-phase1-market-lane",
+  "caelus-phase1-guild-lane",
+  "caelus-phase1-residential-loop",
+  "caelus-phase1-service-lane",
+  "caelus-phase1-buildings-warm",
+  "caelus-phase1-buildings-sage",
+  "caelus-phase1-market-square",
+  "caelus-phase1-guild-court",
+  "caelus-phase1-town-well",
+  "createauthoredmesh",
+  "creategabledbody",
+  "createpitchedroof",
+  "rigidcitymeshespresent",
   "new combatpresentationdirector",
   "combat-stance-indicator",
   "combat-impact-burst",
@@ -199,6 +214,7 @@ if (mainSource.includes("new BABYLON.Engine(canvas, true")) {
 }
 const recoveryIndex = mainSource.indexOf("new VisualRecoveryDirector(game)");
 const guardIndex = mainSource.indexOf("installVerticalSliceRuntimeGuard(VerticalSliceDirector)");
+const phaseOneInstallIndex = mainSource.indexOf("installCaelusTownPhaseOne(VerticalSliceDirector)");
 const sliceIndex = mainSource.indexOf("new VerticalSliceDirector(game)");
 const phaseZeroIndex = mainSource.indexOf("new CaelusPhaseZeroDirector(game)");
 const actorRebaseIndex = mainSource.indexOf("new VerticalSliceActorRebase(game)");
@@ -212,7 +228,8 @@ const routeAudioIndex = mainSource.indexOf("new RouteAudioDirector(game)");
 const bridgeIndex = mainSource.indexOf("new PlaytestBridge(game, renderer)");
 if (
   guardIndex < 0
-  || recoveryIndex < 0
+  || phaseOneInstallIndex <= guardIndex
+  || recoveryIndex <= phaseOneInstallIndex
   || sliceIndex <= recoveryIndex
   || phaseZeroIndex <= sliceIndex
   || actorRebaseIndex <= phaseZeroIndex
@@ -225,7 +242,7 @@ if (
   || routeAudioIndex <= presentationIndex
   || bridgeIndex <= routeAudioIndex
 ) {
-  throw new Error("Vertical slice, Caelus recovery, traversal, combat, audio, and playtest initialization order is invalid.");
+  throw new Error("Caelus Phase One, vertical slice, recovery, traversal, combat, audio, and playtest initialization order is invalid.");
 }
 
 const workflow = await readFile(".github/workflows/quality.yml", "utf8");
@@ -251,6 +268,14 @@ for (const requiredBrowserRule of [
   'bridgeCall<GeometryAudit>(page, "geometryAudit")',
   '"weapon-idle-right-profile"',
   'audit.legacyCaelusMeshesEnabled',
+  'audit.rigidCityMeshesPresent',
+  'audit.caelusTownPhaseOneVersion',
+  'audit.townTerrainRange',
+  '"city-market"',
+  '"city-guild"',
+  '"city-residential"',
+  '"city-service"',
+  '"city-supply"',
   'audit.transparentArchitectureMaterials',
   '"foundry-core"',
   '"pillar-lift"',
@@ -273,4 +298,4 @@ for (const asset of manifest.assets) {
   }
 }
 
-console.log("Project Ascension Caelus phase zero and permanent browser gate checks passed.");
+console.log("Project Ascension Caelus Phase One layout and permanent browser gates passed.");
