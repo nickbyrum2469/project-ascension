@@ -44,7 +44,7 @@ for (const banned of ["todo:", "replace later", "temporary asset", "placeholder 
 for (const requiredFeature of [
   "foundrylabyrinth",
   "sigilsactivated",
-  "sentineldefeated",
+  "guardiandefeated",
   "foundry sentinel",
   "slam",
   "restorecore",
