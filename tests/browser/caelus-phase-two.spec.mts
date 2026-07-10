@@ -19,6 +19,7 @@ interface CollisionAudit {
 
 interface PhaseTwoAudit {
   version: number;
+  roadVisualRevision: number;
   wellRecovered: boolean;
   drainageBandCount: number;
   collisionAudit: CollisionAudit | null;
@@ -30,6 +31,10 @@ interface PhaseTwoAudit {
   wellRelocated: boolean;
   roadMaterialFrozen: boolean;
   roadEdgeMaterialFrozen: boolean;
+  curbHalfWidth: number;
+  curbHeightOffset: number;
+  channelHalfWidth: number;
+  channelHeightOffset: number;
   phaseTwoMaterialCount: number;
 }
 
@@ -74,6 +79,21 @@ const capture = async (page: Page, testInfo: TestInfo, name: string): Promise<vo
   });
 };
 
+const captureLockedView = async (
+  page: Page,
+  testInfo: TestInfo,
+  name: string,
+  player: [number, number, number],
+  camera: [number, number, number, number]
+): Promise<void> => {
+  await bridgeCall(page, "teleport", ...player);
+  await bridgeCall(page, "setPaused", true);
+  await bridgeCall(page, "cameraPose", ...camera);
+  await capture(page, testInfo, name);
+  await bridgeCall(page, "clearCameraPose");
+  await bridgeCall(page, "setPaused", false);
+};
+
 test("Caelus Phase Two roads and civic collision are production-safe", async ({ page }, testInfo) => {
   const consoleErrors: string[] = [];
   page.on("pageerror", (error) => consoleErrors.push(`pageerror: ${error.message}`));
@@ -92,6 +112,7 @@ test("Caelus Phase Two roads and civic collision are production-safe", async ({ 
 
   const audit = await bridgeCall<PhaseTwoAudit>(page, "phaseTwoAudit");
   expect(audit.version).toBe(1);
+  expect(audit.roadVisualRevision).toBe(2);
   expect(audit.wellRecovered).toBe(true);
   expect(audit.drainageBandCount).toBe(20);
   expect(audit.missingDrainageMeshes).toEqual([]);
@@ -102,6 +123,10 @@ test("Caelus Phase Two roads and civic collision are production-safe", async ({ 
   expect(audit.wellRelocated).toBe(true);
   expect(audit.roadMaterialFrozen).toBe(true);
   expect(audit.roadEdgeMaterialFrozen).toBe(true);
+  expect(audit.curbHalfWidth).toBeCloseTo(0.24, 3);
+  expect(audit.curbHeightOffset).toBeCloseTo(0.082, 3);
+  expect(audit.channelHalfWidth).toBeCloseTo(0.15, 3);
+  expect(audit.channelHeightOffset).toBeCloseTo(0.058, 3);
   expect(audit.phaseTwoMaterialCount).toBe(2);
   expect(audit.collisionAudit).not.toBeNull();
   expect(audit.collisionAudit?.duplicatePairs).toBe(0);
@@ -131,21 +156,34 @@ test("Caelus Phase Two roads and civic collision are production-safe", async ({ 
   const mainStreetMovement = await bridgeCall<Snapshot>(page, "simulate", 5.5, ["ShiftLeft", "KeyW"]);
   expect(mainStreetMovement.z).toBeGreaterThan(120);
 
-  await bridgeCall(page, "teleport", 0, 70, 0);
-  await bridgeCall(page, "simulate", 0.12);
-  await capture(page, testInfo, "phase2-main-road-drainage");
-
-  await bridgeCall(page, "teleport", -2, 112, -Math.PI / 2);
-  await bridgeCall(page, "simulate", 0.12);
-  await capture(page, testInfo, "phase2-relocated-town-well");
-
-  await bridgeCall(page, "teleport", -20, 103, -0.8);
-  await bridgeCall(page, "simulate", 0.12);
-  await capture(page, testInfo, "phase2-market-lane-drainage");
-
-  await bridgeCall(page, "teleport", 24, 108, 0.8);
-  await bridgeCall(page, "simulate", 0.12);
-  await capture(page, testInfo, "phase2-guild-lane-drainage");
+  await captureLockedView(
+    page,
+    testInfo,
+    "phase2-main-road-drainage",
+    [0, 70, 0],
+    [9, 7, -15, 1.5]
+  );
+  await captureLockedView(
+    page,
+    testInfo,
+    "phase2-relocated-town-well",
+    [-10, 112, 0],
+    [15, 10, -18, 2.4]
+  );
+  await captureLockedView(
+    page,
+    testInfo,
+    "phase2-market-lane-drainage",
+    [-35, 119, -0.8],
+    [13, 8, -15, 1.6]
+  );
+  await captureLockedView(
+    page,
+    testInfo,
+    "phase2-guild-lane-drainage",
+    [35, 130, 0.8],
+    [-13, 8, -15, 1.6]
+  );
 
   const runtimeErrors = await bridgeCall<string[]>(page, "errors");
   const evidencePath = testInfo.outputPath("phase-two-collision-audit.json");
