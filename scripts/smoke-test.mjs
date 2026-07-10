@@ -4,6 +4,7 @@ import { constants } from "node:fs";
 const requiredFiles = [
   "index.html",
   "src/main.ts",
+  "src/core/PerformanceDirector.ts",
   "src/game/Game.ts",
   "src/game/Player.ts",
   "src/game/QuestSystem.ts",
@@ -30,6 +31,7 @@ for (const id of ids) {
 
 const sourceFiles = await Promise.all([
   "src/main.ts",
+  "src/core/PerformanceDirector.ts",
   "src/game/Game.ts",
   "src/game/Player.ts",
   "src/game/QuestSystem.ts",
@@ -99,7 +101,19 @@ for (const requiredFeature of [
   "loadout-strip",
   "installinterfacepauseguard",
   ".journal-shell.open, .loadout-overlay.open",
-  ".journal-shell.open, .pause-panel:not(.hidden), .dialogue-panel:not(.hidden)"
+  ".journal-shell.open, .pause-panel:not(.hidden), .dialogue-panel:not(.hidden)",
+  "new performancedirector",
+  "mesh.mergemeshes",
+  "batched-tree-trunks",
+  "batched-red-grass",
+  "batched-city-",
+  "usepoissonsampling",
+  "refreshrate_render_oneverytwoframes",
+  "sethardwarescalinglevel",
+  "updatedistanceculling",
+  "skippointermovepicking",
+  "bloomscale",
+  "freezeworldmatrix"
 ]) {
   if (!productionSource.includes(requiredFeature)) {
     throw new Error(`Missing required production feature: ${requiredFeature}`);
@@ -109,6 +123,17 @@ for (const requiredFeature of [
 const questSource = await readFile("src/game/QuestSystem.ts", "utf8");
 if (questSource.includes('this.save.equipment.equippedCharm = this.save.labyrinth.guardianDefeated')) {
   throw new Error("Charm selection must not be overwritten automatically by guardian progression.");
+}
+
+const performanceSource = await readFile("src/core/PerformanceDirector.ts", "utf8");
+for (const forbiddenRegression of [
+  "useBlurExponentialShadowMap = true",
+  "pipeline.samples = 2",
+  "shadowMap.refreshRate = 1"
+]) {
+  if (performanceSource.includes(forbiddenRegression)) {
+    throw new Error(`Performance recovery regressed to an expensive setting: ${forbiddenRegression}`);
+  }
 }
 
 const manifest = JSON.parse(await readFile("public/assets/asset-manifest.json", "utf8"));
@@ -121,4 +146,4 @@ for (const asset of manifest.assets) {
   }
 }
 
-console.log("Project Ascension production smoke checks passed.");
+console.log("Project Ascension production and performance smoke checks passed.");
