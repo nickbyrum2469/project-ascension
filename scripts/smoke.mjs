@@ -4,6 +4,8 @@ import { constants } from "node:fs";
 const requiredFiles = [
   "index.html",
   "src/main.ts",
+  "src/core/CombatFeelDirector.ts",
+  "src/core/PerformanceDirector.ts",
   "src/game/Game.ts",
   "src/game/Player.ts",
   "src/game/QuestSystem.ts",
@@ -28,6 +30,8 @@ for (const id of ids) {
 
 const sourceFiles = await Promise.all([
   "src/main.ts",
+  "src/core/CombatFeelDirector.ts",
+  "src/core/PerformanceDirector.ts",
   "src/data/GameTypes.ts",
   "src/game/Game.ts",
   "src/game/Player.ts",
@@ -72,11 +76,37 @@ for (const requiredFeature of [
   "eastern-pillar-lift",
   "updateambience",
   "respawnoutdoorenemies",
-  "completeascent"
+  "completeascent",
+  "new performancedirector",
+  "mesh.mergemeshes",
+  "sethardwarescalinglevel",
+  "new combatfeeldirector",
+  "trailmesh",
+  "warden-third-person-trail",
+  "warden-first-person-trail",
+  "confirmhit",
+  "hitstop",
+  "combat-damage-number",
+  "updateDamageLabels".toLowerCase(),
+  "startstagger",
+  "combat-combo",
+  "detectguardimpact",
+  "updatecamerapunch"
 ]) {
   if (!productionSource.includes(requiredFeature)) {
     throw new Error(`Missing required production feature: ${requiredFeature}`);
   }
+}
+
+const combatSource = await readFile("src/core/CombatFeelDirector.ts", "utf8");
+if (combatSource.includes("CreateTube") || combatSource.includes("CreateRibbon")) {
+  throw new Error("Combat feedback must not rebuild trail geometry every frame.");
+}
+if (!combatSource.includes("current < previous")) {
+  throw new Error("Hit-stop must be driven by confirmed enemy health loss.");
+}
+if (!combatSource.includes("copyFrom(pulse.originalScaling)")) {
+  throw new Error("Enemy stagger feedback must restore the original enemy scale.");
 }
 
 const manifest = JSON.parse(await readFile("public/assets/asset-manifest.json", "utf8"));
@@ -89,4 +119,4 @@ for (const asset of manifest.assets) {
   }
 }
 
-console.log("Project Ascension consolidated production checks passed.");
+console.log("Project Ascension combat-feel production checks passed.");
