@@ -16,6 +16,10 @@ export class RiftBoar implements Damageable {
 
   private readonly isGuardian: boolean;
   private readonly guardianRings: any[] = [];
+  private readonly telegraphRoot: any;
+  private readonly telegraphRing: any;
+  private readonly telegraphSweep: any;
+  private readonly telegraphMaterial: any;
   private state: BoarState = "idle";
   private stateTime = 0;
   private patrolTime = 0;
@@ -53,9 +57,16 @@ export class RiftBoar implements Damageable {
     this.root.getChildMeshes().forEach((mesh: any) => world.shadowGenerator.addShadowCaster(mesh));
     this.patrolHeading = this.root.rotation.y;
 
+    const telegraph = this.createCombatTelegraph(index);
+    this.telegraphRoot = telegraph.root;
+    this.telegraphRing = telegraph.ring;
+    this.telegraphSweep = telegraph.sweep;
+    this.telegraphMaterial = telegraph.material;
+
     if (this.isGuardian) {
       this.createGuardianPresentation();
       this.root.setEnabled(quests.save.labyrinth.entered && this.alive);
+      this.telegraphRoot.setEnabled(quests.save.labyrinth.entered && this.alive);
     }
   }
 
@@ -65,6 +76,7 @@ export class RiftBoar implements Damageable {
     if (this.isGuardian) {
       if (!this.quests.save.labyrinth.entered) {
         this.root.setEnabled(false);
+        this.telegraphRoot.setEnabled(false);
         return;
       }
       if (this.quests.save.labyrinth.guardianDefeated && this.alive) {
@@ -72,9 +84,11 @@ export class RiftBoar implements Damageable {
         this.setState("dead");
       }
       if (this.alive && !this.root.isEnabled()) this.root.setEnabled(true);
+      if (this.alive && !this.telegraphRoot.isEnabled()) this.telegraphRoot.setEnabled(true);
     }
 
     if (!this.alive) {
+      this.telegraphRoot.setEnabled(false);
       this.animateDeath(delta);
       return;
     }
@@ -92,6 +106,7 @@ export class RiftBoar implements Damageable {
 
     const ground = this.world.heightAt(this.root.position.x, this.root.position.z);
     this.root.position.y = ground;
+    this.updateCombatTelegraph(delta, ground);
     this.animate(delta);
   }
 
@@ -219,7 +234,7 @@ export class RiftBoar implements Damageable {
         this.attackPattern = (this.attackPattern + 1) % 3;
         this.setState(this.attackPattern === 1 ? "slam" : "windup");
       } else {
-        this.move(direction, (enraged ? 4.35 : 3.45), delta);
+        this.move(direction, enraged ? 4.35 : 3.45, delta);
       }
     } else if (this.state === "windup") {
       this.face(direction, delta * 7.5);
@@ -231,7 +246,7 @@ export class RiftBoar implements Damageable {
       this.root.scaling.z = 2.2 + Math.min(0.28, this.stateTime * 0.28);
 
       if (this.stateTime >= windupDuration && this.stateTime <= attackEnd) {
-        this.move(direction, (enraged ? 14 : 11.5), delta);
+        this.move(direction, enraged ? 14 : 11.5, delta);
         if (!this.attackConnected && distance < 4.15) {
           this.attackConnected = true;
           if (playerBlocking) {
@@ -278,6 +293,73 @@ export class RiftBoar implements Damageable {
       this.visual.body.rotation.z = Math.sin(this.stateTime * 24) * 0.055;
       if (this.stateTime >= (enraged ? 0.16 : 0.24)) this.setState("chase");
     }
+  }
+
+  private createCombatTelegraph(index: number): { root: any; ring: any; sweep: any; material: any } {
+    const root = new BABYLON.TransformNode(`boar-telegraph-root-${index}`, this.world.scene);
+    const material = createMaterial(
+      this.world.scene,
+      `boar-telegraph-material-${index}`,
+      this.isGuardian ? "#ff6a3d" : "#ffb34d",
+      0.05,
+      0.12,
+      this.isGuardian ? "#ff3d2e" : "#ff8a32"
+    );
+    material.alpha = 0;
+    material.emissiveIntensity = 2.4;
+    material.disableLighting = true;
+
+    const ring = BABYLON.MeshBuilder.CreateTorus(`boar-danger-ring-${index}`, {
+      diameter: 2,
+      thickness: this.isGuardian ? 0.085 : 0.055,
+      tessellation: 64
+    }, this.world.scene);
+    ring.rotation.x = Math.PI / 2;
+    ring.material = material;
+    ring.parent = root;
+
+    const sweep = BABYLON.MeshBuilder.CreateDisc(`boar-danger-sweep-${index}`, {
+      radius: 1,
+      tessellation: 64,
+      arc: this.isGuardian ? 0.18 : 0.12,
+      sideOrientation: BABYLON.Mesh.DOUBLESIDE
+    }, this.world.scene);
+    sweep.rotation.x = Math.PI / 2;
+    sweep.rotation.z = Math.PI / 2;
+    sweep.position.y = 0.012;
+    sweep.material = material;
+    sweep.parent = root;
+
+    root.setEnabled(false);
+    return { root, ring, sweep, material };
+  }
+
+  private updateCombatTelegraph(delta: number, ground: number): void {
+    const attacking = this.state === "windup" || this.state === "slam";
+    if (!attacking) {
+      this.telegraphMaterial.alpha = BABYLON.Scalar.Lerp(this.telegraphMaterial.alpha, 0, Math.min(1, delta * 18));
+      if (this.telegraphMaterial.alpha < 0.01) this.telegraphRoot.setEnabled(false);
+      return;
+    }
+
+    if (!this.telegraphRoot.isEnabled()) this.telegraphRoot.setEnabled(true);
+    const enraged = this.isGuardian && this.health <= this.maxHealth * 0.5;
+    const isSlam = this.state === "slam";
+    const duration = isSlam ? (enraged ? 0.72 : 0.92) : (this.isGuardian ? (enraged ? 0.58 : 0.78) : 0.58);
+    const progress = BABYLON.Scalar.Clamp(this.stateTime / duration, 0, 1);
+    const radius = isSlam ? (enraged ? 6.8 : 5.8) : (this.isGuardian ? 4.15 : 2.05);
+    const anticipation = 0.78 + progress * 0.22;
+
+    this.telegraphRoot.position.copyFromFloats(this.root.position.x, ground + 0.055, this.root.position.z);
+    this.telegraphRoot.rotation.y = this.root.rotation.y;
+    this.telegraphRing.scaling.setAll(radius * anticipation);
+    this.telegraphSweep.scaling.setAll(radius * anticipation);
+    this.telegraphSweep.setEnabled(!isSlam);
+    this.telegraphRing.setEnabled(true);
+    this.telegraphRing.rotation.z += delta * (enraged ? 3.8 : 2.5);
+    this.telegraphSweep.rotation.z = Math.PI / 2 + Math.sin(this.stateTime * 7) * 0.08;
+    this.telegraphMaterial.alpha = 0.18 + progress * 0.58 + Math.sin(this.stateTime * 22) * 0.06;
+    this.telegraphMaterial.emissiveIntensity = (enraged ? 3.8 : 2.4) + progress * 2.2;
   }
 
   private applyHitReaction(delta: number): void {
@@ -384,7 +466,10 @@ export class RiftBoar implements Damageable {
     this.state = state;
     this.stateTime = 0;
     this.attackConnected = false;
-    if (state === "windup" || state === "slam") this.audio.creatureCharge();
+    if (state === "windup" || state === "slam") {
+      this.audio.creatureCharge();
+      this.telegraphRoot.setEnabled(true);
+    }
   }
 
   private lerpAngle(current: number, target: number, amount: number): number {
