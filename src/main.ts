@@ -1,6 +1,7 @@
 import "./styles.css";
 import * as BabylonModule from "babylonjs";
 import { CombatFeelDirector } from "./core/CombatFeelDirector.js";
+import { FloorTwoArrivalDirector } from "./core/FloorTwoArrivalDirector.js";
 import { PerformanceDirector } from "./core/PerformanceDirector.js";
 import { ExpeditionJournal } from "./ui/ExpeditionJournal.js";
 import { LoadoutOverlay } from "./ui/LoadoutOverlay.js";
@@ -100,6 +101,7 @@ const boot = async (): Promise<void> => {
     applyEmergencyGpuBudget(game);
     new PerformanceDirector(engine, game.world, renderer);
     new CombatFeelDirector(game, engine);
+    new FloorTwoArrivalDirector(game);
     game.run();
   } catch (error) {
     console.error(error);
