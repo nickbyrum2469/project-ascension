@@ -31,6 +31,7 @@ export class FoundryLabyrinth {
   private readonly coreMaterial: any;
   private readonly originX: number;
   private readonly originZ: number;
+  private lastPlayerPosition: any | null = null;
   private elapsed = 0;
 
   constructor(private readonly world: World) {
@@ -136,6 +137,26 @@ export class FoundryLabyrinth {
       ring.rotation.y += delta * (index % 2 === 0 ? 0.4 : -0.52);
       ring.rotation.z += delta * 0.08 * (index + 1);
     });
+    this.applyRuntimeCollision();
+  }
+
+  private applyRuntimeCollision(): void {
+    const player = this.world.scene.getTransformNodeByName("warden-root");
+    if (!player) return;
+    if (!this.lastPlayerPosition) {
+      this.lastPlayerPosition = player.position.clone();
+      return;
+    }
+
+    const runtimeState: LabyrinthSave = {
+      unlocked: true,
+      entered: !this.sealedGate.isEnabled(),
+      sigilsActivated: [false, false, false],
+      coreRestored: !this.shortcutGate.isEnabled(),
+      shortcutOpened: !this.shortcutGate.isEnabled()
+    };
+    this.resolvePlayerPosition(player.position, this.lastPlayerPosition, runtimeState);
+    this.lastPlayerPosition.copyFrom(player.position);
   }
 
   private createStructure(): void {
