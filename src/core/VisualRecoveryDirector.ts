@@ -12,7 +12,7 @@ export class VisualRecoveryDirector {
   private readonly world: any;
   private readonly player: any;
 
-  constructor(private readonly game: any) {
+  constructor(game: any) {
     this.scene = game.world.scene;
     this.world = game.world;
     this.player = game.player;
