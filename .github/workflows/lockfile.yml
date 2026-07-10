@@ -1,0 +1,32 @@
+name: Commit Verified Dependency Lock
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - package.json
+      - .github/workflows/lockfile.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: foundation/milestone-01
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Commit verified lockfile
+        run: |
+          git config user.name "Project Ascension Build"
+          git config user.email "actions@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "[lockfile] build: lock verified dependencies"
+          git push origin HEAD:foundation/milestone-01
