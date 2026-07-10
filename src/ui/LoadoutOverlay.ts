@@ -74,6 +74,8 @@ export class LoadoutOverlay {
         event.preventDefault();
         event.stopImmediatePropagation();
         this.open ? this.hide() : this.show();
+      } else if (this.open && event.code === "KeyJ") {
+        this.hide();
       } else if (this.open && event.code === "Escape") {
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -105,7 +107,10 @@ export class LoadoutOverlay {
 
   private show(): void {
     const hud = document.getElementById("hud");
-    if (!hud || hud.classList.contains("hidden")) return;
+    const conflictingInterface = document.querySelector(
+      ".journal-shell.open, .pause-panel:not(.hidden), .dialogue-panel:not(.hidden)"
+    );
+    if (!hud || hud.classList.contains("hidden") || conflictingInterface) return;
     this.open = true;
     document.exitPointerLock?.();
     window.dispatchEvent(new Event("blur"));
