@@ -19,7 +19,10 @@ interface Snapshot {
   cameraMode: "first" | "third";
   stamina: number;
   attack: string | null;
+  fps: number;
   verticalSliceVersion: number | null;
+  caelusPhaseZeroVersion: number | null;
+  weaponMountInstalled: boolean;
   protectedRouteCollisionVolumesRemoved: number;
   runtimeErrors: string[];
 }
@@ -31,6 +34,14 @@ interface GeometryAudit {
   terrainBumpTexture: string | null;
   collisionBoxes: number;
   verticalSliceVersion: number | null;
+  caelusPhaseZeroVersion: number | null;
+  weaponMountInstalled: boolean;
+  weaponMountParent: string | null;
+  legacyCaelusMeshesEnabled: string[];
+  unsupportedCityMeshesEnabled: string[];
+  transparentArchitectureMaterials: string[];
+  legacyCaelusCollisionVolumesRemoved: number;
+  opaqueArchitectureMaterials: number;
   dynamicActorsRebased: boolean;
   protectedRouteCollisionVolumesRemoved: number;
 }
@@ -82,6 +93,8 @@ test("production vertical slice remains traversable and visually auditable", asy
   expect(start.inputEnabled).toBe(true);
   expect(start.cameraMode).toBe("third");
   expect(start.verticalSliceVersion).toBe(2);
+  expect(start.caelusPhaseZeroVersion).toBe(1);
+  expect(start.weaponMountInstalled).toBe(true);
 
   await bridgeCall(page, "keyDown", "KeyW");
   const heldInput = await bridgeCall<Snapshot>(page, "snapshot");
@@ -103,6 +116,14 @@ test("production vertical slice remains traversable and visually auditable", asy
   const combatReady = await bridgeCall<Snapshot>(page, "snapshot");
   expect(combatReady.cameraMode).toBe("third");
   expect(combatReady.grounded).toBe(true);
+
+  await bridgeCall(page, "setPaused", true);
+  await bridgeCall(page, "cameraPose", 4.25, 1.85, 0, 1.25);
+  await capture(page, testInfo, "weapon-idle-right-profile");
+  await bridgeCall(page, "cameraPose", -4.25, 1.85, 0, 1.25);
+  await capture(page, testInfo, "weapon-idle-left-profile");
+  await bridgeCall(page, "setPaused", false);
+  await simulate(page, 0.1);
 
   const staminaBeforeHeavy = combatReady.stamina;
   const heavy = await simulate(page, 0.08, ["KeyQ"]);
@@ -133,14 +154,29 @@ test("production vertical slice remains traversable and visually auditable", asy
   expect(audit.terrainBumpTexture).toBeNull();
   expect(audit.collisionBoxes).toBeGreaterThan(20);
   expect(audit.verticalSliceVersion).toBe(2);
+  expect(audit.caelusPhaseZeroVersion).toBe(1);
+  expect(audit.weaponMountInstalled).toBe(true);
+  expect(audit.weaponMountParent).toBe("warden-right-hand");
+  expect(audit.legacyCaelusMeshesEnabled).toEqual([]);
+  expect(audit.unsupportedCityMeshesEnabled).toEqual([]);
+  expect(audit.transparentArchitectureMaterials).toEqual([]);
+  expect(audit.legacyCaelusCollisionVolumesRemoved).toBe(5);
+  expect(audit.opaqueArchitectureMaterials).toBeGreaterThanOrEqual(10);
   expect(audit.dynamicActorsRebased).toBe(true);
   expect(audit.protectedRouteCollisionVolumesRemoved).toBeGreaterThan(0);
+
+  const auditPath = testInfo.outputPath("caelus-phase-zero-audit.json");
+  await mkdir(dirname(auditPath), { recursive: true });
+  await writeFile(auditPath, JSON.stringify({ start, audit }, null, 2));
 
   const views = [
     "spawn",
     "gate-exterior",
+    "gate-interior",
     "city-boulevard",
+    "city-market",
     "city-plaza",
+    "city-north",
     "frontier",
     "foundry-breach"
   ];
