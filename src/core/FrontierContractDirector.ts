@@ -93,11 +93,12 @@ export class FrontierContractDirector {
     const expedition = this.quests.save.expedition as any;
     const saved = expedition.contracts ?? {};
     const normalize = (id: ContractId): ContractRecord => {
-      const value = saved[id] ?? {};
+      const fallback = defaultRecord();
+      const value = saved[id] ?? fallback;
       return {
-        active: Boolean(value.active),
-        progress: Math.max(0, Number(value.progress ?? 0)),
-        completions: Math.max(0, Number(value.completions ?? 0))
+        active: Boolean(value.active ?? fallback.active),
+        progress: Math.max(0, Number(value.progress ?? fallback.progress)),
+        completions: Math.max(0, Number(value.completions ?? fallback.completions))
       };
     };
     const state: ContractState = {
