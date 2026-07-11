@@ -325,7 +325,7 @@ export class CaelusIntegratedCity {
   private channelCount = 0;
   private hiddenLegacyMeshes = 0;
 
-  constructor(private readonly game: any, private readonly contracts: any) {
+  constructor(game: any, private readonly contracts: any) {
     this.scene = game.world.scene;
     this.world = game.world;
 
@@ -1009,7 +1009,7 @@ export class CaelusIntegratedCity {
   private buildLanterns(materials: Record<string, any>): void {
     const positions = [
       [-8, 45], [8, 61], [-9, 82], [9, 98], [-10, 137], [10, 164], [-9, 188],
-      [-25, 101], [-44, 111], [-48, 131], [23, 115], [42, 141], [58, 91]
+      [-25, 101], [-45, 117], [24, 112], [43, 141], [58, 91]
     ];
     positions.forEach(([x, z], index) => {
       const ground = this.world.heightAt(x, z);
