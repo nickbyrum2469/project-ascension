@@ -1,7 +1,7 @@
 {
   "channel": "latest-test-build",
-  "sourceSha": "ed4c66c8ffd5779df6807694bc790386be920a04",
-  "shortSha": "ed4c66c8ffd5",
-  "publishedAt": "2026-07-11T07:44:10Z",
+  "sourceSha": "ba6aae78a62aa7861ed891465c0f179d823742d1",
+  "shortSha": "ba6aae78a62a",
+  "publishedAt": "2026-07-11T07:44:58Z",
   "sourceRef": "milestone-22/set-1-4-road-reset"
 }
