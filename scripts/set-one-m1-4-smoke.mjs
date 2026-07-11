@@ -54,7 +54,8 @@ for (const feature of [
 
 for (const feature of [
   "const GATE_TOWER_X = 13",
-  "#7f876f",
+  "const PATH_COLOR = \"#68705d\"",
+  "const ROAD_COLOR = \"#18211f\"",
   "caelusReferenceGateClearWidth: 16.8",
   "referenceTownPolishAudit",
   "caelus-reference-gate-tower-"
@@ -76,7 +77,8 @@ for (const assertion of [
   "expect(audit.houseWallIntersections).toEqual([])",
   "expect(audit.houseHouseIntersections).toEqual([])",
   "expect(audit.blockedMainRouteSamples).toBe(0)",
-  "expect(polish.pathColor).toBe(\"#7f876f\")",
+  "expect(polish.pathColor).toBe(\"#68705d\")",
+  "expect(polish.roadColor).toBe(\"#18211f\")",
   "expect(polish.gateClearWidth).toBeGreaterThan(16)",
   "reference-town-aerial",
   "reference-town-upper-left-well"
