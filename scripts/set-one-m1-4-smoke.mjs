@@ -42,7 +42,8 @@ for (const feature of [
   "referenceTownMeshes",
   "caelus-reference-main-street-road-surface",
   "caelus-reference-well-dark-shaft",
-  "caelus-reference-wall-south-left",
+  "this.createWall(\"south-left\"",
+  "`caelus-reference-wall-${id}`",
   "supersededByReferenceTown"
 ]) {
   if (!director.includes(feature)) throw new Error(`Missing Set 1.4 production feature: ${feature}`);
