@@ -90,8 +90,8 @@ test("the complete Project Ascension route remains playable with the rebuilt tow
   expect(throughSouthGate.z).toBeGreaterThan(27);
 
   await bridgeCall(page, "teleport", 0, 32, 0);
-  const mainRoadWalk = await bridgeCall<Snapshot>(page, "simulate", 8.5, ["ShiftLeft", "KeyW"]);
-  expect(mainRoadWalk.z).toBeGreaterThan(100);
+  const mainRoadWalk = await bridgeCall<Snapshot>(page, "simulate", 10.5, ["ShiftLeft", "KeyW"]);
+  expect(mainRoadWalk.z).toBeGreaterThan(105);
   await capture(page, testInfo, "reference-route-main-road");
 
   await bridgeCall(page, "teleport", 0, 208, 0);
