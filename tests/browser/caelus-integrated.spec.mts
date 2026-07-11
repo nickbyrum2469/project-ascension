@@ -165,12 +165,13 @@ test("integrated Caelus city, forward sword, and stable guard are production-saf
     await bridgeCall(page, "setPlayerHeading", yaw);
     await bridgeCall(page, "simulate", 0.16, []);
     const rig = await bridgeCall<CombatRigAudit>(page, "combatRigAudit");
-    expect(rig.version).toBe(1);
+    expect(rig.version).toBe(2);
     expect(rig.swordForwardRuleInstalled).toBe(true);
     expect(rig.stableGuardRuleInstalled).toBe(true);
     expect(rig.liveForwardDot, `${name} sword tip must remain ahead of the hilt`).toBeGreaterThan(0.25);
+    expect(rig.metadataForwardDot).toBeGreaterThan(0.25);
     expect(rig.swordParent).toBe("caelus-third-person-sword-mount");
-    expect(rig.swordRotationX).toBeGreaterThan(0);
+    expect(Math.abs(rig.swordRotationX)).toBeGreaterThan(1);
     headingEvidence[name] = rig;
   }
 
