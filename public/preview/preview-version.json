@@ -1,7 +1,7 @@
 {
   "channel": "latest-test-build",
-  "sourceSha": "3308e5df27d06a496437137f7cf056e2f641e487",
-  "shortSha": "3308e5df27d0",
-  "publishedAt": "2026-07-11T14:31:42Z",
+  "sourceSha": "0e8b1943b1ab27604c2d32cfa27b8f91ff1f053d",
+  "shortSha": "0e8b1943b1ab",
+  "publishedAt": "2026-07-11T14:33:12Z",
   "sourceRef": "milestone-23/set-1-4-road-connectivity-real"
 }
