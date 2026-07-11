@@ -3,15 +3,17 @@ import { constants } from "node:fs";
 
 const requiredFiles = [
   "src/core/CaelusReferenceTownDirector.ts",
+  "src/core/CaelusReferenceTownPolishDirector.ts",
   "tests/browser/caelus-reference-town.spec.mts",
   "tests/browser/combat-reference.spec.mts",
   "tests/browser/vertical-slice-reference.spec.mts"
 ];
 await Promise.all(requiredFiles.map((file) => access(file, constants.R_OK)));
 
-const [main, director, referenceTest, combatTest, routeTest, workflow] = await Promise.all([
+const [main, director, polish, referenceTest, combatTest, routeTest, workflow] = await Promise.all([
   readFile("src/main.ts", "utf8"),
   readFile("src/core/CaelusReferenceTownDirector.ts", "utf8"),
+  readFile("src/core/CaelusReferenceTownPolishDirector.ts", "utf8"),
   readFile("tests/browser/caelus-reference-town.spec.mts", "utf8"),
   readFile("tests/browser/combat-reference.spec.mts", "utf8"),
   readFile("tests/browser/vertical-slice-reference.spec.mts", "utf8"),
@@ -20,9 +22,10 @@ const [main, director, referenceTest, combatTest, routeTest, workflow] = await P
 
 const bridgeIndex = main.indexOf("new PlaytestBridge(game, renderer)");
 const referenceIndex = main.indexOf("new CaelusReferenceTownDirector(game)");
+const polishIndex = main.indexOf("new CaelusReferenceTownPolishDirector(game)");
 const surveyIndex = main.indexOf("new CaelusBaselineSurveyDirector(game)");
-if (bridgeIndex < 0 || referenceIndex <= bridgeIndex || surveyIndex <= referenceIndex) {
-  throw new Error("The reference-town director must install after PlaytestBridge and before city surveys.");
+if (bridgeIndex < 0 || referenceIndex <= bridgeIndex || polishIndex <= referenceIndex || surveyIndex <= polishIndex) {
+  throw new Error("Reference town and final polish must install after PlaytestBridge and before city surveys.");
 }
 
 for (const feature of [
@@ -49,6 +52,16 @@ for (const feature of [
   if (!director.includes(feature)) throw new Error(`Missing Set 1.4 production feature: ${feature}`);
 }
 
+for (const feature of [
+  "const GATE_TOWER_X = 13",
+  "#7f876f",
+  "caelusReferenceGateClearWidth: 16.8",
+  "referenceTownPolishAudit",
+  "caelus-reference-gate-tower-"
+]) {
+  if (!polish.includes(feature)) throw new Error(`Missing Set 1.4 polish feature: ${feature}`);
+}
+
 const houseDefinitions = director.match(/id: "(?:upper|middle|lower)-/g) ?? [];
 if (houseDefinitions.length !== 20) throw new Error(`Expected exactly 20 approved house definitions, found ${houseDefinitions.length}.`);
 
@@ -63,6 +76,8 @@ for (const assertion of [
   "expect(audit.houseWallIntersections).toEqual([])",
   "expect(audit.houseHouseIntersections).toEqual([])",
   "expect(audit.blockedMainRouteSamples).toBe(0)",
+  "expect(polish.pathColor).toBe(\"#7f876f\")",
+  "expect(polish.gateClearWidth).toBeGreaterThan(16)",
   "reference-town-aerial",
   "reference-town-upper-left-well"
 ]) {
@@ -72,7 +87,7 @@ for (const assertion of [
 for (const feature of ["guardStabilityProbe", "swordForwardVerified", "referenceTownAudit"]) {
   if (!combatTest.includes(feature)) throw new Error(`Missing reference combat regression: ${feature}`);
 }
-for (const feature of ["foundry-breach", "pillar-lift", "referenceTownAudit", "throughNorthGate"]) {
+for (const feature of ["foundry-breach", "pillar-lift", "referenceTownAudit", "throughNorthGate", "10.5"]) {
   if (!routeTest.includes(feature)) throw new Error(`Missing reference vertical-slice regression: ${feature}`);
 }
 for (const file of [
@@ -83,7 +98,7 @@ for (const file of [
   if (!workflow.includes(file)) throw new Error(`Quality workflow does not run ${file}.`);
 }
 
-const combined = `${director}\n${referenceTest}\n${combatTest}\n${routeTest}`.toLowerCase();
+const combined = `${director}\n${polish}\n${referenceTest}\n${combatTest}\n${routeTest}`.toLowerCase();
 for (const banned of ["placeholder asset", "replace later", "temporary asset", "todo:"]) {
   if (combined.includes(banned)) throw new Error(`Set 1.4 source contains banned marker: ${banned}`);
 }
