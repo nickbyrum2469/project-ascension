@@ -61,10 +61,13 @@ for (const feature of [
 }
 
 for (const feature of [
-  "combatRigCorrectionVersion: 1",
+  "combatRigCorrectionVersion: 2",
   "swordForwardRuleInstalled",
   "stableGuardRuleInstalled",
-  "Math.PI / 2",
+  "swordDirectionUsesMeasuredGeometry",
+  "measureForwardDot",
+  "enforceForwardAxis",
+  "swordForwardCorrections",
   "guardAnchor",
   "guardFramesStable",
   "swordForwardDot"
@@ -88,6 +91,7 @@ for (const assertion of [
   'bridgeCall<CombatRigAudit>(page, "combatRigAudit")',
   'bridgeCall(page, "setGuardHeld", true)',
   'bridgeCall(page, "setPlayerHeading"',
+  "rig.metadataForwardDot",
   "audit.audit?.curbInsideJunction",
   "audit.audit?.roadBuildingOverlaps",
   '"integrated-gate-exterior"',
