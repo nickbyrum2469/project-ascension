@@ -49,10 +49,14 @@ for (const feature of [
 }
 
 for (const feature of [
-  "relocateServiceWorkshop",
-  "integratedLayoutCorrectionVersion: 1",
+  "relocateBuilding",
+  "integratedLayoutCorrectionVersion: 2",
   "roadBuildingOverlaps = 0",
-  "main-workshop-east-frontage-corrected"
+  "buildingOverlapPairs = 0",
+  'id: "main-workshop-east"',
+  'id: "market-storehouse"',
+  "main-workshop-east-frontage-corrected",
+  "market-storehouse-frontage-corrected"
 ]) {
   if (!polish.includes(feature)) throw new Error(`Missing layout correction feature: ${feature}`);
 }
