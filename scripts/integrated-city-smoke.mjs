@@ -40,7 +40,8 @@ for (const feature of [
   "roadBuildingOverlaps",
   "buildingOverlapPairs",
   "caelus-integrated-well-dark-shaft",
-  "caelus-integrated-guild-hall-body",
+  'id: "guild-hall"',
+  "`caelus-integrated-${definition.id}-body`",
   "boarContractAvailable",
   "closedSolidGeometry"
 ]) {
