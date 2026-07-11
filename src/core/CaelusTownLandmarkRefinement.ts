@@ -12,7 +12,7 @@ export class CaelusTownLandmarkBuilder {
   private readonly world: any;
 
   constructor(
-    private readonly game: any,
+    game: any,
     private readonly generated: any[],
     private readonly roadMaterial: any,
     private readonly houseRefiner: CaelusTownHouseRefiner
