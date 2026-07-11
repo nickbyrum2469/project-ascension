@@ -4,6 +4,7 @@ import * as BabylonModule from "babylonjs";
 import { RouteAudioDirector } from "./audio/RouteAudioDirector.js";
 import { CaelusBaselineSurveyDirector } from "./core/CaelusBaselineSurveyDirector.js";
 import { CaelusControlledTerrainDirector, installCaelusControlledTerrain } from "./core/CaelusControlledTerrainDirector.js";
+import { installCaelusControlledTerrainPerimeterGuard } from "./core/CaelusControlledTerrainPerimeterGuard.js";
 import { CaelusIntegratedRepairDirector } from "./core/CaelusIntegratedRepairDirector.js";
 import { CaelusMigrationCompatibility } from "./core/CaelusMigrationCompatibility.js";
 import { CaelusPhaseTwoPlaytestExtension } from "./core/CaelusPhaseTwoPlaytestExtension.js";
@@ -188,6 +189,7 @@ const boot = async (): Promise<void> => {
     installVerticalSliceRuntimeGuard(VerticalSliceDirector);
     installCaelusTownPhaseOne(VerticalSliceDirector);
     installCaelusControlledTerrain(VerticalSliceDirector);
+    installCaelusControlledTerrainPerimeterGuard(VerticalSliceDirector);
     const { engine, renderer } = await createEngine(canvas);
     const game = new Game(engine, canvas, renderer);
     new ExpeditionJournal();
