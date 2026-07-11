@@ -1,7 +1,7 @@
 {
   "channel": "latest-test-build",
-  "sourceSha": "39e74cdc03b23a5bf3ee822070441860fbc34278",
-  "shortSha": "39e74cdc03b2",
-  "publishedAt": "2026-07-11T15:03:02Z",
+  "sourceSha": "17a68e18b83cc6ee01fdcc6bcbd2597799be35b1",
+  "shortSha": "17a68e18b83c",
+  "publishedAt": "2026-07-11T15:07:08Z",
   "sourceRef": "milestone-23/set-1-4-2-road-roof-alignment"
 }
