@@ -63,13 +63,13 @@ jobs:
       matrix:
         include:
           - name: vertical-slice
-            file: tests/browser/vertical-slice.spec.mts
-          - name: integrated-city
-            file: tests/browser/caelus-phase-two.spec.mts
+            file: tests/browser/vertical-slice-reference.spec.mts
+          - name: combat-reference
+            file: tests/browser/combat-reference.spec.mts
           - name: baseline-survey
             file: tests/browser/caelus-baseline-survey.spec.mts
-          - name: town-boundary
-            file: tests/browser/caelus-town-boundary.spec.mts
+          - name: reference-town
+            file: tests/browser/caelus-reference-town.spec.mts
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
