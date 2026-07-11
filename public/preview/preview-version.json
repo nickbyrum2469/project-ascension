@@ -1,7 +1,7 @@
 {
   "channel": "latest-test-build",
-  "sourceSha": "c6f7fa16ccdc490fcce4462488182297979cb4e4",
-  "shortSha": "c6f7fa16ccdc",
-  "publishedAt": "2026-07-11T04:19:56Z",
+  "sourceSha": "082203c874c49fb15baf8ae359a4b7e81f8165d2",
+  "shortSha": "082203c874c4",
+  "publishedAt": "2026-07-11T04:40:38Z",
   "sourceRef": "milestone-20/caelus-set-one-baseline-survey"
 }
