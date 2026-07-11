@@ -12,6 +12,7 @@ import { CaelusPhaseZeroDirector } from "./core/CaelusPhaseZeroDirector.js";
 import { CaelusReferenceTownDirector } from "./core/CaelusReferenceTownDirector.js";
 import { CaelusReferenceTownPolishDirector } from "./core/CaelusReferenceTownPolishDirector.js";
 import { CaelusRoadConnectivityDirector } from "./core/CaelusRoadConnectivityDirector.js";
+import { CaelusRoofAlignmentDirector } from "./core/CaelusRoofAlignmentDirector.js";
 import { installCaelusTownPhaseOne } from "./core/CaelusTownPhaseOne.js";
 import { CaelusTownBoundaryDirector } from "./core/CaelusTownBoundaryDirector.js";
 import { CaelusTownPhaseTwo } from "./core/CaelusTownPhaseTwo.js";
@@ -220,6 +221,7 @@ const boot = async (): Promise<void> => {
     new CaelusControlledTerrainDirector(game);
     new CaelusReferenceTownDirector(game);
     new CaelusReferenceTownPolishDirector(game);
+    new CaelusRoofAlignmentDirector(game);
     new CaelusRoadConnectivityDirector(game);
     new CaelusBaselineSurveyDirector(game);
     new CaelusTownBoundaryDirector(game);
