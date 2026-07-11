@@ -29,6 +29,7 @@ interface ReferenceTownAudit {
 interface ReferenceTownPolishAudit {
   version: number;
   pathColor: string;
+  roadColor: string;
   gateTowerX: number;
   gateClearWidth: number;
   southGateZ: number;
@@ -105,8 +106,9 @@ test("Set 1.4 matches the approved straight-road walled-town reference", async (
   expect(audit.removedCollisionVolumes).toBeGreaterThan(10);
 
   const polish = await bridgeCall<ReferenceTownPolishAudit>(page, "referenceTownPolishAudit");
-  expect(polish.version).toBe(1);
-  expect(polish.pathColor).toBe("#7f876f");
+  expect(polish.version).toBe(2);
+  expect(polish.pathColor).toBe("#68705d");
+  expect(polish.roadColor).toBe("#18211f");
   expect(polish.gateTowerX).toBe(13);
   expect(polish.gateClearWidth).toBeGreaterThan(16);
 
