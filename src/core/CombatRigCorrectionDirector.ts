@@ -9,6 +9,7 @@ export class CombatRigCorrectionDirector {
   private guardAnchor: any | null = null;
   private lastForwardDot = 0;
   private guardFrames = 0;
+  private forwardCorrections = 0;
 
   constructor(game: any) {
     this.scene = game.world.scene;
@@ -22,9 +23,10 @@ export class CombatRigCorrectionDirector {
     this.scene.onBeforeRenderObservable.add(() => this.update());
     this.scene.metadata = {
       ...(this.scene.metadata ?? {}),
-      combatRigCorrectionVersion: 1,
+      combatRigCorrectionVersion: 2,
       swordForwardRuleInstalled: Boolean(this.swordMount && this.tipMarker && this.hiltMarker),
-      stableGuardRuleInstalled: true
+      stableGuardRuleInstalled: true,
+      swordDirectionUsesMeasuredGeometry: true
     };
   }
 
@@ -45,7 +47,7 @@ export class CombatRigCorrectionDirector {
     this.sword.parent = mount;
     this.sword.position = new BABYLON.Vector3(0, -0.02, 0.02);
     this.sword.rotationQuaternion = null;
-    this.sword.rotation = new BABYLON.Vector3(Math.PI / 2, 0, 0.06);
+    this.sword.rotation = new BABYLON.Vector3(-Math.PI / 2, 0, 0.06);
     this.sword.scaling = new BABYLON.Vector3(1, 1, 1);
     return mount;
   }
@@ -70,19 +72,15 @@ export class CombatRigCorrectionDirector {
       this.guardAnchor = null;
       this.guardFrames = 0;
       if (!attacking) this.applyForwardIdle();
-      else this.correctAttackForwardAxis();
     }
 
+    this.enforceForwardAxis();
     this.updateForwardAudit();
   }
 
   private applyForwardIdle(): void {
     this.sword.position.set(0, -0.02, 0.02);
-    this.sword.rotation.set(Math.PI / 2, 0, 0.06);
-  }
-
-  private correctAttackForwardAxis(): void {
-    if (this.sword.rotation.x < 0) this.sword.rotation.x *= -1;
+    this.sword.rotation.set(-Math.PI / 2, 0, 0.06);
   }
 
   private applyStableGuard(): void {
@@ -115,27 +113,47 @@ export class CombatRigCorrectionDirector {
     this.visual.leftForearm.rotation.set(-0.68, 0, -0.08);
 
     this.sword.position.set(0, -0.02, 0.03);
-    this.sword.rotation.set(0.82, -0.1, -0.72);
+    this.sword.rotation.set(-0.82, -0.1, -0.72);
   }
 
-  private updateForwardAudit(): void {
+  private measureForwardDot(): number {
+    this.visual.root.computeWorldMatrix?.(true);
+    this.swordMount?.computeWorldMatrix?.(true);
     this.sword.computeWorldMatrix?.(true);
     this.hiltMarker?.computeWorldMatrix?.(true);
     this.tipMarker?.computeWorldMatrix?.(true);
     const hilt = this.hiltMarker?.getAbsolutePosition?.();
     const tip = this.tipMarker?.getAbsolutePosition?.();
-    if (!hilt || !tip) return;
+    if (!hilt || !tip) return 0;
 
     const blade = tip.subtract(hilt);
     blade.y = 0;
     const forward = this.player.forward();
-    if (blade.lengthSquared() > 0.0001) blade.normalize();
-    if (forward.lengthSquared() > 0.0001) forward.normalize();
-    this.lastForwardDot = BABYLON.Vector3.Dot(blade, forward);
+    if (blade.lengthSquared() <= 0.0001 || forward.lengthSquared() <= 0.0001) return 0;
+    blade.normalize();
+    forward.normalize();
+    return BABYLON.Vector3.Dot(blade, forward);
+  }
 
+  private enforceForwardAxis(): void {
+    let dot = this.measureForwardDot();
+    if (dot >= 0.05) {
+      this.lastForwardDot = dot;
+      return;
+    }
+
+    this.sword.rotation.x += this.sword.rotation.x >= 0 ? -Math.PI : Math.PI;
+    this.forwardCorrections += 1;
+    dot = this.measureForwardDot();
+    this.lastForwardDot = dot;
+  }
+
+  private updateForwardAudit(): void {
+    this.lastForwardDot = this.measureForwardDot();
     this.scene.metadata = {
       ...(this.scene.metadata ?? {}),
       swordForwardDot: Number(this.lastForwardDot.toFixed(4)),
+      swordForwardCorrections: this.forwardCorrections,
       guardFramesStable: this.guardFrames,
       guardAnchorActive: Boolean(this.guardAnchor),
       guardRootRoll: Number(this.player.root.rotation.z.toFixed(4)),
