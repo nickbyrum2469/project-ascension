@@ -6,7 +6,7 @@ interface IntegratedBridgeApi {
 }
 
 export class CaelusIntegratedPlaytestExtension {
-  constructor(private readonly game: any) {
+  constructor(game: any) {
     if (!new URLSearchParams(window.location.search).has("playtest")) return;
     const bridge = (globalThis as typeof globalThis & {
       __ASCENSION_PLAYTEST__?: IntegratedBridgeApi;
