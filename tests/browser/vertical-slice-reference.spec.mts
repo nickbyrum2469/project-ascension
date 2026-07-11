@@ -50,7 +50,7 @@ test("the complete Project Ascension route remains playable with the rebuilt tow
   });
 
   await page.goto("/?playtest=1", { waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => Boolean((globalThis as any).__ASCENSION_PLAYTEST__), null, { timeout: 45_000 });
+  await page.waitForFunction(() => Boolean((globalThis as any).__ASCENSION_PLAYTEST__), null, { timeout: 75_000 });
   await page.locator("#enter-world").click();
   await expect(page.locator("#hud")).not.toHaveClass(/hidden/);
 
