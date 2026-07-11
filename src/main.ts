@@ -3,6 +3,7 @@ import "./combat-presentation.css";
 import * as BabylonModule from "babylonjs";
 import { RouteAudioDirector } from "./audio/RouteAudioDirector.js";
 import { CaelusBaselineSurveyDirector } from "./core/CaelusBaselineSurveyDirector.js";
+import { CaelusControlledTerrainDirector, installCaelusControlledTerrain } from "./core/CaelusControlledTerrainDirector.js";
 import { CaelusIntegratedRepairDirector } from "./core/CaelusIntegratedRepairDirector.js";
 import { CaelusMigrationCompatibility } from "./core/CaelusMigrationCompatibility.js";
 import { CaelusPhaseTwoPlaytestExtension } from "./core/CaelusPhaseTwoPlaytestExtension.js";
@@ -186,6 +187,7 @@ const boot = async (): Promise<void> => {
     installInterfacePauseGuard(Game);
     installVerticalSliceRuntimeGuard(VerticalSliceDirector);
     installCaelusTownPhaseOne(VerticalSliceDirector);
+    installCaelusControlledTerrain(VerticalSliceDirector);
     const { engine, renderer } = await createEngine(canvas);
     const game = new Game(engine, canvas, renderer);
     new ExpeditionJournal();
@@ -210,6 +212,7 @@ const boot = async (): Promise<void> => {
     new CameraSafetyDirector(game);
     new RouteAudioDirector(game);
     new PlaytestBridge(game, renderer);
+    new CaelusControlledTerrainDirector(game);
     new CaelusBaselineSurveyDirector(game);
     new CaelusTownBoundaryDirector(game);
     new CaelusPhaseTwoPlaytestExtension(game);
