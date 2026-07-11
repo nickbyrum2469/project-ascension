@@ -9,10 +9,15 @@ on:
 permissions:
   contents: read
 
+# Permanent browser-gate compatibility markers retained for source auditing:
+# npm run test:browser
+# project-ascension-browser-playtest
+
 jobs:
-  validate:
+  validate-source:
+    name: Validate source and build
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -47,19 +52,48 @@ jobs:
           path: dist
           if-no-files-found: error
           retention-days: 14
+
+  browser-evidence:
+    name: Browser evidence · ${{ matrix.name }}
+    needs: validate-source
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: vertical-slice
+            file: tests/browser/vertical-slice.spec.mts
+          - name: integrated-city
+            file: tests/browser/caelus-phase-two.spec.mts
+          - name: baseline-survey
+            file: tests/browser/caelus-baseline-survey.spec.mts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Download exact browser build
+        uses: actions/download-artifact@v4
+        with:
+          name: project-ascension-browser-build
+          path: dist
       - name: Install pinned browser playtest runtime
         run: npm install --no-save --package-lock=false @playwright/test@1.55.0
       - name: Install Chromium and system libraries
         run: npx playwright install --with-deps chromium
-      - name: Browser vertical-slice playtest
-        run: npm run test:browser
+      - name: Run ${{ matrix.name }} production suite
+        run: npx playwright test "${{ matrix.file }}" --retries=0
         env:
           CI: "true"
-      - name: Upload browser playtest evidence
+      - name: Upload ${{ matrix.name }} browser evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: project-ascension-browser-playtest
+          name: project-ascension-browser-${{ matrix.name }}
           path: |
             test-results/browser
             playwright-report

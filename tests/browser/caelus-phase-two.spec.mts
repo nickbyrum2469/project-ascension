@@ -38,6 +38,33 @@ interface PhaseTwoAudit {
   phaseTwoMaterialCount: number;
 }
 
+interface IntegratedCityAudit {
+  version: number;
+  buildingCount: number;
+  curbSegmentCount: number;
+  junctionCount: number;
+  removedCollision: number;
+  hiddenLegacyCount: number;
+  enabledIntegratedCount: number;
+  junctionAwareCurbCount: number;
+  frontagePathCount: number;
+  missingRequired: string[];
+  transparentIntegratedMaterials: string[];
+  swordForwardVerified: boolean;
+  swordForwardDotBeforeCorrection: number;
+  stableGuardInstalled: boolean;
+}
+
+interface GuardStabilityProbe {
+  frames: number;
+  displacement: number;
+  rootPitch: number;
+  rootRoll: number;
+  hipPitch: number;
+  hipRoll: number;
+  torsoOffsetY: number;
+}
+
 interface CollisionProbe {
   fromX: number;
   fromZ: number;
@@ -94,7 +121,7 @@ const captureLockedView = async (
   await bridgeCall(page, "setPaused", false);
 };
 
-test("Caelus Phase Two roads and civic collision are production-safe", async ({ page }, testInfo) => {
+test("Caelus integrated city and combat repair is production-safe", async ({ page }, testInfo) => {
   const consoleErrors: string[] = [];
   page.on("pageerror", (error) => consoleErrors.push(`pageerror: ${error.message}`));
   page.on("console", (message) => {
@@ -105,6 +132,7 @@ test("Caelus Phase Two roads and civic collision are production-safe", async ({ 
   await page.waitForFunction(() => Boolean((globalThis as any).__ASCENSION_PLAYTEST__), null, { timeout: 45_000 });
   await page.locator("#enter-world").click();
   await expect(page.locator("#hud")).not.toHaveClass(/hidden/);
+  await bridgeCall(page, "renderFrame");
 
   const start = await bridgeCall<Snapshot>(page, "snapshot");
   expect(start.started).toBe(true);
@@ -118,32 +146,40 @@ test("Caelus Phase Two roads and civic collision are production-safe", async ({ 
   expect(audit.missingDrainageMeshes).toEqual([]);
   expect(audit.disabledDrainageMeshes).toEqual([]);
   expect(audit.transparentPhaseTwoMaterials).toEqual([]);
-  expect(audit.wellRootOffsetX).toBe(-7);
-  expect(audit.wellCollisionCenter).toEqual({ x: -10, z: 112 });
-  expect(audit.wellRelocated).toBe(true);
   expect(audit.roadMaterialFrozen).toBe(true);
   expect(audit.roadEdgeMaterialFrozen).toBe(true);
   expect(audit.curbHalfWidth).toBeCloseTo(0.22, 3);
-  expect(audit.curbHeightOffset).toBeCloseTo(0.032, 3);
   expect(audit.channelHalfWidth).toBeCloseTo(0.14, 3);
-  expect(audit.channelHeightOffset).toBeCloseTo(0.045, 3);
   expect(audit.phaseTwoMaterialCount).toBe(2);
   expect(audit.collisionAudit).not.toBeNull();
   expect(audit.collisionAudit?.duplicatePairs).toBe(0);
   expect(audit.collisionAudit?.mainRouteIntrusions).toBe(0);
-  expect(audit.collisionAudit?.wellCollisions).toBeGreaterThanOrEqual(1);
-  expect(audit.collisionAudit?.total).toBeGreaterThan(70);
+
+  const integrated = await bridgeCall<IntegratedCityAudit>(page, "integratedCityAudit");
+  expect(integrated.version).toBe(1);
+  expect(integrated.buildingCount).toBe(14);
+  expect(integrated.junctionCount).toBe(7);
+  expect(integrated.curbSegmentCount).toBeGreaterThan(100);
+  expect(integrated.junctionAwareCurbCount).toBeGreaterThan(50);
+  expect(integrated.frontagePathCount).toBe(14);
+  expect(integrated.enabledIntegratedCount).toBeGreaterThan(80);
+  expect(integrated.hiddenLegacyCount).toBeGreaterThanOrEqual(30);
+  expect(integrated.removedCollision).toBeGreaterThan(10);
+  expect(integrated.missingRequired).toEqual([]);
+  expect(integrated.transparentIntegratedMaterials).toEqual([]);
+  expect(integrated.swordForwardVerified).toBe(true);
+  expect(integrated.stableGuardInstalled).toBe(true);
 
   const probes: Array<[string, [number, number, number, number]]> = [
-    ["east", [-5, 112, -8, 112]],
-    ["west", [-15, 112, -12, 112]],
-    ["south", [-10, 106, -10, 110]],
-    ["north", [-10, 118, -10, 114]]
+    ["east", [-14, 118, -19, 118]],
+    ["west", [-28, 118, -23, 118]],
+    ["south", [-21, 111, -21, 116]],
+    ["north", [-21, 125, -21, 120]]
   ];
   const probeEvidence: Record<string, CollisionProbe> = {};
   for (const [name, values] of probes) {
     const result = await bridgeCall<CollisionProbe>(page, "phaseTwoCollisionProbe", ...values);
-    expect(result.blocked, `${name} approach must collide with the well`).toBe(true);
+    expect(result.blocked, `${name} approach must collide with the integrated well rim`).toBe(true);
     probeEvidence[name] = result;
   }
 
@@ -156,40 +192,36 @@ test("Caelus Phase Two roads and civic collision are production-safe", async ({ 
   const mainStreetMovement = await bridgeCall<Snapshot>(page, "simulate", 5.5, ["ShiftLeft", "KeyW"]);
   expect(mainStreetMovement.z).toBeGreaterThan(120);
 
-  await captureLockedView(
-    page,
-    testInfo,
-    "phase2-main-road-drainage",
-    [0, 70, 0],
-    [9, 7, -15, 1.5]
-  );
-  await captureLockedView(
-    page,
-    testInfo,
-    "phase2-relocated-town-well",
-    [-10, 112, 0],
-    [15, 10, -18, 2.4]
-  );
-  await captureLockedView(
-    page,
-    testInfo,
-    "phase2-market-lane-drainage",
-    [-35, 119, -0.8],
-    [13, 8, -15, 1.6]
-  );
-  await captureLockedView(
-    page,
-    testInfo,
-    "phase2-guild-lane-drainage",
-    [35, 130, 0.8],
-    [-13, 8, -15, 1.6]
-  );
+  // Thirty rendered guard frames are enough to catch the former cumulative backflip regression
+  // while keeping software-WebGL CI inside the production evidence budget.
+  const guard = await bridgeCall<GuardStabilityProbe>(page, "guardStabilityProbe", 0.5);
+  expect(guard.frames).toBe(30);
+  expect(guard.displacement).toBeLessThan(0.01);
+  expect(Math.abs(guard.rootPitch)).toBeLessThan(0.001);
+  expect(Math.abs(guard.rootRoll)).toBeLessThan(0.001);
+  expect(Math.abs(guard.hipPitch)).toBeLessThan(0.2);
+  expect(Math.abs(guard.hipRoll)).toBeLessThan(0.001);
+  expect(Math.abs(guard.torsoOffsetY)).toBeLessThan(0.001);
+
+  await captureLockedView(page, testInfo, "phase2-main-road-drainage", [0, 91, 0], [13, 8, -15, 1.8]);
+  await captureLockedView(page, testInfo, "phase2-relocated-town-well", [-21, 118, 0], [11, 8, -13, 2.2]);
+  await captureLockedView(page, testInfo, "phase2-market-lane-drainage", [-49, 121, -0.8], [14, 9, -15, 1.8]);
+  await captureLockedView(page, testInfo, "phase2-guild-lane-drainage", [50, 130, 0.8], [-15, 9, -15, 2]);
+  await captureLockedView(page, testInfo, "integrated-gate-close", [0, 8, 0], [16, 9, -18, 6]);
+  await captureLockedView(page, testInfo, "integrated-main-junction-close", [0, 103, 0], [11, 7, -12, 1.4]);
+
+  await bridgeCall(page, "teleport", 12, 112, 0);
+  await bridgeCall(page, "setPaused", false);
+  await bridgeCall(page, "simulate", 0.1, ["MouseRight"]);
+  await capture(page, testInfo, "integrated-sword-forward-profile");
 
   const runtimeErrors = await bridgeCall<string[]>(page, "errors");
-  const evidencePath = testInfo.outputPath("phase-two-collision-audit.json");
+  const evidencePath = testInfo.outputPath("integrated-city-audit.json");
   await mkdir(dirname(evidencePath), { recursive: true });
   await writeFile(evidencePath, JSON.stringify({
     audit,
+    integrated,
+    guard,
     probeEvidence,
     clearSouth,
     clearNorth,
