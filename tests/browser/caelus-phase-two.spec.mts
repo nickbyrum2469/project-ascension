@@ -38,6 +38,11 @@ interface PhaseTwoAudit {
   phaseTwoMaterialCount: number;
 }
 
+interface IntegratedCityAudit {
+  version: number;
+  wellPosition: { x: number; z: number } | null;
+}
+
 interface CollisionProbe {
   fromX: number;
   fromZ: number;
@@ -134,16 +139,20 @@ test("Caelus Phase Two roads and civic collision are production-safe", async ({ 
   expect(audit.collisionAudit?.wellCollisions).toBeGreaterThanOrEqual(1);
   expect(audit.collisionAudit?.total).toBeGreaterThan(70);
 
+  const integrated = await bridgeCall<IntegratedCityAudit>(page, "integratedCityAudit");
+  const activeWell = integrated.version >= 1 && integrated.wellPosition
+    ? integrated.wellPosition
+    : { x: -10, z: 112 };
   const probes: Array<[string, [number, number, number, number]]> = [
-    ["east", [-5, 112, -8, 112]],
-    ["west", [-15, 112, -12, 112]],
-    ["south", [-10, 106, -10, 110]],
-    ["north", [-10, 118, -10, 114]]
+    ["east", [activeWell.x + 5, activeWell.z, activeWell.x + 2, activeWell.z]],
+    ["west", [activeWell.x - 5, activeWell.z, activeWell.x - 2, activeWell.z]],
+    ["south", [activeWell.x, activeWell.z - 6, activeWell.x, activeWell.z - 3]],
+    ["north", [activeWell.x, activeWell.z + 6, activeWell.x, activeWell.z + 3]]
   ];
   const probeEvidence: Record<string, CollisionProbe> = {};
   for (const [name, values] of probes) {
     const result = await bridgeCall<CollisionProbe>(page, "phaseTwoCollisionProbe", ...values);
-    expect(result.blocked, `${name} approach must collide with the well`).toBe(true);
+    expect(result.blocked, `${name} approach must collide with the active well`).toBe(true);
     probeEvidence[name] = result;
   }
 
@@ -167,7 +176,7 @@ test("Caelus Phase Two roads and civic collision are production-safe", async ({ 
     page,
     testInfo,
     "phase2-relocated-town-well",
-    [-10, 112, 0],
+    [activeWell.x, activeWell.z, 0],
     [15, 10, -18, 2.4]
   );
   await captureLockedView(
@@ -190,6 +199,8 @@ test("Caelus Phase Two roads and civic collision are production-safe", async ({ 
   await mkdir(dirname(evidencePath), { recursive: true });
   await writeFile(evidencePath, JSON.stringify({
     audit,
+    integrated,
+    activeWell,
     probeEvidence,
     clearSouth,
     clearNorth,
