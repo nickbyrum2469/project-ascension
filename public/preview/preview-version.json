@@ -1,7 +1,7 @@
 {
   "channel": "latest-test-build",
-  "sourceSha": "0e8b1943b1ab27604c2d32cfa27b8f91ff1f053d",
-  "shortSha": "0e8b1943b1ab",
-  "publishedAt": "2026-07-11T14:33:12Z",
-  "sourceRef": "milestone-23/set-1-4-road-connectivity-real"
+  "sourceSha": "e0fc468ac123bdd0e074f9147a60abdaa4f20787",
+  "shortSha": "e0fc468ac123",
+  "publishedAt": "2026-07-11T14:55:26Z",
+  "sourceRef": "milestone-23/set-1-4-2-road-roof-alignment"
 }
