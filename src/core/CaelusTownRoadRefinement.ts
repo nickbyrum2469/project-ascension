@@ -30,7 +30,7 @@ export class CaelusTownRoadRefiner {
     depth: building.depth + 3
   }));
 
-  constructor(private readonly game: any, public readonly roadMaterial: any) {
+  constructor(game: any, public readonly roadMaterial: any) {
     this.scene = game.world.scene;
     this.world = game.world;
   }
