@@ -1,7 +1,7 @@
 {
   "channel": "latest-test-build",
-  "sourceSha": "be5c1ffaefafdb2e82927629b0a9a2e50a9e6d05",
-  "shortSha": "be5c1ffaefaf",
-  "publishedAt": "2026-07-11T03:02:50Z",
-  "sourceRef": "milestone-19/caelus-integrated-city-repair"
+  "sourceSha": "c6f7fa16ccdc490fcce4462488182297979cb4e4",
+  "shortSha": "c6f7fa16ccdc",
+  "publishedAt": "2026-07-11T04:19:56Z",
+  "sourceRef": "milestone-20/caelus-set-one-baseline-survey"
 }
