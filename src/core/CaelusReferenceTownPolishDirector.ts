@@ -8,6 +8,8 @@ interface CollisionBox {
 const GATE_TOWER_X = 13;
 const SOUTH_GATE_Z = 14;
 const NORTH_GATE_Z = 228;
+const PATH_COLOR = "#68705d";
+const ROAD_COLOR = "#18211f";
 
 export class CaelusReferenceTownPolishDirector {
   constructor(game: any) {
@@ -16,10 +18,18 @@ export class CaelusReferenceTownPolishDirector {
 
     const pathMaterial = scene.getMaterialByName?.("caelus-reference-path");
     if (pathMaterial) {
-      const pathColor = BABYLON.Color3.FromHexString("#7f876f");
+      const pathColor = BABYLON.Color3.FromHexString(PATH_COLOR);
       pathMaterial.diffuseColor = pathColor;
-      pathMaterial.ambientColor = pathColor.scale(0.28);
+      pathMaterial.ambientColor = pathColor.scale(0.24);
       pathMaterial.specularColor = BABYLON.Color3.Black();
+    }
+
+    const roadMaterial = scene.getMaterialByName?.("caelus-reference-road");
+    if (roadMaterial) {
+      const roadColor = BABYLON.Color3.FromHexString(ROAD_COLOR);
+      roadMaterial.diffuseColor = roadColor;
+      roadMaterial.ambientColor = roadColor.scale(0.35);
+      roadMaterial.specularColor = BABYLON.Color3.Black();
     }
 
     const gateTowerLayout = [
@@ -64,16 +74,18 @@ export class CaelusReferenceTownPolishDirector {
 
     scene.metadata = {
       ...(scene.metadata ?? {}),
-      caelusReferenceTownPolishVersion: 1,
-      caelusReferencePathColor: "#7f876f",
+      caelusReferenceTownPolishVersion: 2,
+      caelusReferencePathColor: PATH_COLOR,
+      caelusReferenceRoadColor: ROAD_COLOR,
       caelusReferenceGateClearWidth: 16.8
     };
 
     const bridge = (globalThis as any).__ASCENSION_PLAYTEST__;
     if (bridge) {
       bridge.referenceTownPolishAudit = () => ({
-        version: 1,
-        pathColor: "#7f876f",
+        version: 2,
+        pathColor: PATH_COLOR,
+        roadColor: ROAD_COLOR,
         gateTowerX: GATE_TOWER_X,
         gateClearWidth: 16.8,
         southGateZ: SOUTH_GATE_Z,
