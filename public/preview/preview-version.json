@@ -1,7 +1,7 @@
 {
   "channel": "latest-test-build",
-  "sourceSha": "f7ef04f5e62f91065e8567fca17d2da43bb5b80b",
-  "shortSha": "f7ef04f5e62f",
-  "publishedAt": "2026-07-11T05:21:49Z",
-  "sourceRef": "milestone-19/caelus-integrated-city-repair"
+  "sourceSha": "dafcbaf7a0aad05b2cb3379c51df2bbaf4610bcf",
+  "shortSha": "dafcbaf7a0aa",
+  "publishedAt": "2026-07-11T05:39:51Z",
+  "sourceRef": "milestone-21/caelus-final-town-boundary"
 }
