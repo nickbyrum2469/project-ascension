@@ -1,7 +1,7 @@
 {
   "channel": "latest-test-build",
-  "sourceSha": "dafcbaf7a0aad05b2cb3379c51df2bbaf4610bcf",
-  "shortSha": "dafcbaf7a0aa",
-  "publishedAt": "2026-07-11T05:39:51Z",
-  "sourceRef": "milestone-21/caelus-final-town-boundary"
+  "sourceSha": "54c5c9e5d8ff4f1c85574163ca30d084f4a44cdf",
+  "shortSha": "54c5c9e5d8ff",
+  "publishedAt": "2026-07-11T05:55:39Z",
+  "sourceRef": "milestone-21/set-1-2-final-town-boundary"
 }
