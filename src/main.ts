@@ -3,6 +3,7 @@ import "./combat-presentation.css";
 import * as BabylonModule from "babylonjs";
 import { RouteAudioDirector } from "./audio/RouteAudioDirector.js";
 import { CaelusIntegratedRepairDirector } from "./core/CaelusIntegratedRepairDirector.js";
+import { CaelusMigrationCompatibility } from "./core/CaelusMigrationCompatibility.js";
 import { CaelusPhaseTwoPlaytestExtension } from "./core/CaelusPhaseTwoPlaytestExtension.js";
 import { CaelusPhaseZeroDirector } from "./core/CaelusPhaseZeroDirector.js";
 import { installCaelusTownPhaseOne } from "./core/CaelusTownPhaseOne.js";
@@ -203,6 +204,7 @@ const boot = async (): Promise<void> => {
     new CombatFeelDirector(game, engine);
     new CombatPresentationDirector(game);
     new CaelusIntegratedRepairDirector(game);
+    new CaelusMigrationCompatibility(game);
     new CameraSafetyDirector(game);
     new RouteAudioDirector(game);
     new PlaytestBridge(game, renderer);
