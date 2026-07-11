@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#071019" />
+    <meta name="description" content="Project Ascension — conquer a living world hidden inside a colossal megastructure." />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./assets/branding/ascension-mark.svg" type="image/svg+xml" />
+    <title>Project Ascension — Latest Test Build</title>
+    <script type="module" crossorigin src="./assets/index-gybVIPrD.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/babylon-CSo-G6Yc.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-BPoJakiU.css">
+  </head>
+  <body>
+      <div id="latest-test-build-badge" style="position:fixed;right:12px;bottom:12px;z-index:99999;padding:7px 10px;border:1px solid rgba(142,247,255,.45);border-radius:6px;background:rgba(4,11,19,.82);color:#bffbff;font:600 11px/1.25 system-ui,sans-serif;letter-spacing:.08em;pointer-events:none;backdrop-filter:blur(8px)">LATEST TEST BUILD · be5c1ffaefaf</div>
+    <main id="game-shell" aria-label="Project Ascension game">
+      <canvas id="render-canvas" tabindex="0" aria-label="Project Ascension 3D world"></canvas>
+
+      <section id="boot-screen" class="screen-layer boot-screen" aria-live="polite">
+        <div class="boot-atmosphere"></div>
+        <div class="boot-card">
+          <div class="brand-mark" aria-hidden="true"><i></i><b></b><span></span></div>
+          <p class="eyebrow">FLOOR I · THE VERDANT FOUNDATION</p>
+          <h1>PROJECT <span>ASCENSION</span></h1>
+          <p class="boot-copy">
+            Beyond the walls of Caelus Reach, old machinery has begun to move beneath the western frontier.
+          </p>
+          <button id="enter-world" class="primary-action" type="button">
+            <span>Begin Expedition</span>
+            <kbd>ENTER</kbd>
+          </button>
+          <div class="boot-controls" aria-label="Core controls">
+            <span><kbd>WASD</kbd> Move</span>
+            <span><kbd>MOUSE</kbd> Look</span>
+            <span><kbd>LMB</kbd> Strike</span>
+            <span><kbd>RMB</kbd> Guard</span>
+            <span><kbd>V</kbd> First / Third Person</span>
+            <span><kbd>ESC</kbd> Settings</span>
+          </div>
+          <div id="boot-status" class="boot-status">Preparing the world…</div>
+        </div>
+      </section>
+
+      <section id="hud" class="hud hidden" aria-live="polite">
+        <header class="hud-header">
+          <div class="location-lockup">
+            <small>FLOOR I · CAELUS REACH FRONTIER</small>
+            <strong>Windscar Verge</strong>
+          </div>
+
+          <div class="compass-shell" aria-label="Compass">
+            <span>W</span><i></i><strong id="compass-heading">N</strong><i></i><span>E</span>
+          </div>
+
+          <div class="system-chips">
+            <div id="camera-mode" class="system-chip camera-chip"><kbd>V</kbd><span>THIRD PERSON</span></div>
+            <div id="performance-chip" class="system-chip quiet"><span>WEBGL</span></div>
+          </div>
+        </header>
+
+        <article id="quest-card" class="quest-card">
+          <button id="quest-collapse" class="quest-collapse" type="button" aria-label="Collapse quest tracker">—</button>
+          <div class="quest-heading">
+            <span class="quest-glyph">◇</span>
+            <div><small>ACTIVE THREAD</small><strong id="quest-title">A Quiet Morning</strong></div>
+          </div>
+          <p id="quest-description">Speak with Mara Venn near the expedition lantern.</p>
+          <ul id="quest-objectives"></ul>
+        </article>
+
+        <div id="view-switch-hint" class="view-switch-hint">
+          <kbd>V</kbd>
+          <div><strong>Change Perspective</strong><span>Switch between first and third person at any time.</span></div>
+        </div>
+
+        <div class="hud-top-center">
+          <div id="target-frame" class="target-frame hidden">
+            <span id="target-name">Rift Boar</span>
+            <div class="target-bar"><i id="target-health"></i></div>
+          </div>
+        </div>
+
+        <div id="interaction-prompt" class="interaction-prompt hidden">
+          <kbd>E</kbd><span id="interaction-label">Speak</span>
+        </div>
+
+        <footer class="hud-footer">
+          <div class="vitals">
+            <div class="vital-emblem"><span>AV</span></div>
+            <div class="vital-stack">
+              <div class="vital-row health-row"><div class="bar-shell"><i id="health-bar"></i></div><b id="health-value">100</b></div>
+              <div class="vital-row stamina-row"><div class="bar-shell"><i id="stamina-bar"></i></div><b id="stamina-value">100</b></div>
+              <div class="vital-row focus-row"><div class="bar-shell"><i id="focus-bar"></i></div><b id="focus-value">0</b></div>
+            </div>
+          </div>
+
+          <div class="combat-ribbon" aria-label="Combat controls">
+            <div><kbd>LMB</kbd><span>Light</span></div>
+            <div><kbd>Q</kbd><span>Heavy</span></div>
+            <div><kbd>RMB</kbd><span>Guard</span></div>
+            <div><kbd>CTRL</kbd><span>Dodge</span></div>
+          </div>
+        </footer>
+      </section>
+
+      <section id="dialogue-panel" class="dialogue-panel hidden" aria-modal="true" role="dialog">
+        <div class="speaker-medallion"><span id="speaker-initials">MV</span></div>
+        <div class="dialogue-content">
+          <div class="dialogue-name" id="speaker-name">Mara Venn</div>
+          <p id="dialogue-text"></p>
+          <div id="dialogue-choices" class="dialogue-choices"></div>
+        </div>
+      </section>
+
+      <section id="pause-panel" class="pause-panel hidden" aria-modal="true" role="dialog">
+        <div class="pause-layout">
+          <aside class="pause-sidebar">
+            <p class="eyebrow">EXPEDITION MENU</p>
+            <h2>Field Settings</h2>
+            <p>Camera, presentation, and accessibility controls are saved automatically.</p>
+            <div class="pause-help">
+              <span><kbd>V</kbd> Switch view in game</span>
+              <span><kbd>ESC</kbd> Close menu</span>
+            </div>
+          </aside>
+
+          <div class="settings-panel">
+            <section class="settings-section featured-setting">
+              <div class="setting-copy">
+                <small>CAMERA PERSPECTIVE</small>
+                <strong>Choose how you play</strong>
+                <p>You can change this here or press <kbd>V</kbd> while exploring.</p>
+              </div>
+              <div class="perspective-selector" role="group" aria-label="Camera perspective">
+                <button id="camera-mode-first" type="button" data-camera-mode="first"><span>◎</span>First Person</button>
+                <button id="camera-mode-third" type="button" data-camera-mode="third"><span>◉</span>Third Person</button>
+              </div>
+            </section>
+
+            <section class="settings-section settings-grid">
+              <label>
+                <span><strong>Look sensitivity</strong><small>Mouse and right-stick speed</small></span>
+                <input id="sensitivity-setting" type="range" min="0.2" max="2" step="0.05" value="0.8" />
+              </label>
+              <label>
+                <span><strong>Field of view</strong><small>Wider values show more of the world</small></span>
+                <input id="fov-setting" type="range" min="60" max="100" step="1" value="75" />
+              </label>
+              <label class="switch-setting">
+                <span><strong>Invert vertical look</strong><small>Reverse up and down camera input</small></span>
+                <input id="invert-y-setting" type="checkbox" />
+              </label>
+              <label class="switch-setting">
+                <span><strong>Camera shake</strong><small>Impact and landing camera motion</small></span>
+                <input id="shake-setting" type="checkbox" checked />
+              </label>
+              <label class="switch-setting">
+                <span><strong>Compact quest tracker</strong><small>Minimize objectives during exploration</small></span>
+                <input id="quest-tracker-setting" type="checkbox" />
+              </label>
+            </section>
+
+            <button id="resume-game" class="primary-action compact" type="button">Return to Expedition</button>
+          </div>
+        </div>
+      </section>
+
+      <div id="notification-stack" class="notification-stack" aria-live="polite"></div>
+      <div id="damage-flash" class="damage-flash"></div>
+      <div id="crosshair" class="crosshair hidden" aria-hidden="true"><i></i><b></b><span></span></div>
+    </main>
+
+  </body>
+</html>
