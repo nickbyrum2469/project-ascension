@@ -1,7 +1,7 @@
 {
   "channel": "latest-test-build",
-  "sourceSha": "3d78d0a1b5e5cb2806a560d9dab33de63cdf97e7",
-  "shortSha": "3d78d0a1b5e5",
-  "publishedAt": "2026-07-11T06:09:02Z",
-  "sourceRef": "milestone-21/set-1-2-final-town-boundary"
+  "sourceSha": "43c10d1ab0ac7224a6fa15ca36c7a218319b1ecd",
+  "shortSha": "43c10d1ab0ac",
+  "publishedAt": "2026-07-11T06:20:40Z",
+  "sourceRef": "milestone-21/set-1-3-controlled-terrain"
 }
