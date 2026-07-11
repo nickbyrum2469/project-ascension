@@ -112,7 +112,7 @@ test("Caelus Phase Two roads and civic collision are production-safe", async ({ 
 
   const audit = await bridgeCall<PhaseTwoAudit>(page, "phaseTwoAudit");
   expect(audit.version).toBe(1);
-  expect(audit.roadVisualRevision).toBe(2);
+  expect(audit.roadVisualRevision).toBe(3);
   expect(audit.wellRecovered).toBe(true);
   expect(audit.drainageBandCount).toBe(20);
   expect(audit.missingDrainageMeshes).toEqual([]);
@@ -123,10 +123,10 @@ test("Caelus Phase Two roads and civic collision are production-safe", async ({ 
   expect(audit.wellRelocated).toBe(true);
   expect(audit.roadMaterialFrozen).toBe(true);
   expect(audit.roadEdgeMaterialFrozen).toBe(true);
-  expect(audit.curbHalfWidth).toBeCloseTo(0.24, 3);
-  expect(audit.curbHeightOffset).toBeCloseTo(0.082, 3);
-  expect(audit.channelHalfWidth).toBeCloseTo(0.15, 3);
-  expect(audit.channelHeightOffset).toBeCloseTo(0.058, 3);
+  expect(audit.curbHalfWidth).toBeCloseTo(0.22, 3);
+  expect(audit.curbHeightOffset).toBeCloseTo(0.032, 3);
+  expect(audit.channelHalfWidth).toBeCloseTo(0.14, 3);
+  expect(audit.channelHeightOffset).toBeCloseTo(0.045, 3);
   expect(audit.phaseTwoMaterialCount).toBe(2);
   expect(audit.collisionAudit).not.toBeNull();
   expect(audit.collisionAudit?.duplicatePairs).toBe(0);
