@@ -167,9 +167,9 @@ test("Set 1.4.2 has gap-free terrain roads and aligned full-footprint roofs", as
 
   const roadMeshes = await bridgeCall<string[]>(page, "roadConnectivityMeshes");
   expect(roadMeshes.some((name) => name === "caelus-connected-v2-main-road")).toBe(true);
-  expect(roadMeshes.filter((name) => name.startsWith("caelus-connected-v2-collector-")).toHaveLength(3);
-  expect(roadMeshes.filter((name) => name.startsWith("caelus-connected-v2-frontage-") && !name.includes("junction")).toHaveLength(21);
-  expect(roadMeshes.filter((name) => name.includes("frontage-junction-")).toHaveLength(21);
+  expect(roadMeshes.filter((name) => name.startsWith("caelus-connected-v2-collector-"))).toHaveLength(3);
+  expect(roadMeshes.filter((name) => name.startsWith("caelus-connected-v2-frontage-") && !name.includes("junction"))).toHaveLength(21);
+  expect(roadMeshes.filter((name) => name.includes("frontage-junction-"))).toHaveLength(21);
   expect(roadMeshes.filter((name) => name.endsWith("-gate-apron"))).toHaveLength(2);
 
   await lockedView(page, testInfo, "reference-town-v2-top-down-roads-roofs", [0, 121, 0], [0, 160, -0.01, 1.2]);
