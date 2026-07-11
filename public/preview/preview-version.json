@@ -1,7 +1,7 @@
 {
   "channel": "latest-test-build",
-  "sourceSha": "5b41ad623fafc1c09c29ccec7e79d62ac2de4c48",
-  "shortSha": "5b41ad623faf",
-  "publishedAt": "2026-07-11T06:49:52Z",
-  "sourceRef": "milestone-19/caelus-integrated-city-repair"
+  "sourceSha": "5d76883ee68c8a1fc60aeeb6c2c5f82e0e8189a3",
+  "shortSha": "5d76883ee68c",
+  "publishedAt": "2026-07-11T07:14:43Z",
+  "sourceRef": "milestone-22/set-1-4-road-reset"
 }
