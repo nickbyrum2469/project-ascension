@@ -9,7 +9,7 @@
     "check": "tsc --noEmit",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test:smoke": "node scripts/smoke-test.mjs && node scripts/phase-two-smoke.mjs && node scripts/set-one-m1-1-smoke.mjs && node scripts/set-one-m1-2-smoke.mjs && node scripts/set-one-m1-3-smoke.mjs",
+    "test:smoke": "node scripts/smoke-test.mjs && node scripts/phase-two-smoke.mjs && node scripts/set-one-m1-1-smoke.mjs && node scripts/set-one-m1-2-smoke.mjs && node scripts/set-one-m1-3-smoke.mjs && node scripts/set-one-m1-4-smoke.mjs",
     "test:browser": "playwright test"
   },
   "dependencies": {
