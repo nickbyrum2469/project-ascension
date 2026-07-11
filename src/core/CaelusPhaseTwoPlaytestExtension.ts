@@ -13,6 +13,8 @@ interface PlaytestBridgeApi {
     toX: number,
     toZ: number
   ) => Record<string, unknown>;
+  integratedCityAudit?: () => Record<string, unknown>;
+  guardStabilityProbe?: (seconds: number) => Record<string, unknown>;
 }
 
 export class CaelusPhaseTwoPlaytestExtension {
@@ -115,6 +117,69 @@ export class CaelusPhaseTwoPlaytestExtension {
         resolvedZ: Number(position.z.toFixed(3)),
         blocked
       };
+    };
+
+    bridge.integratedCityAudit = (): Record<string, unknown> => {
+      const scene = game.world.scene;
+      const enabledIntegrated = scene.meshes.filter((mesh: any) => (
+        String(mesh.name ?? "").startsWith("caelus-integrated-") && mesh.isEnabled?.()
+      ));
+      const hiddenLegacy = scene.meshes.filter((mesh: any) => mesh.metadata?.auditCompatibilityOnly === true);
+      const junctionAwareCurbs = enabledIntegrated.filter((mesh: any) => mesh.metadata?.purpose === "junction-aware-curb");
+      const frontagePaths = enabledIntegrated.filter((mesh: any) => mesh.metadata?.purpose === "door-to-road-frontage");
+      const integratedMaterials = scene.materials.filter((material: any) => String(material.name ?? "").startsWith("caelus-integrated-"));
+      const transparentIntegratedMaterials = integratedMaterials.filter((material: any) => (
+        Number(material.alpha ?? 1) < 0.999 || Number(material.transparencyMode ?? 0) !== 0
+      )).map((material: any) => material.name);
+      const required = [
+        "caelus-integrated-town-green-disc",
+        "caelus-integrated-well-dark-shaft",
+        "caelus-integrated-well-ring",
+        "caelus-integrated-market-court",
+        "caelus-integrated-guild-court",
+        "caelus-integrated-guild-quest-board",
+        "caelus-integrated-guild-hall-body",
+        "caelus-integrated-gate-tower--1",
+        "caelus-integrated-gate-tower-1",
+        "caelus-integrated-gate-lintel"
+      ];
+      return {
+        version: Number(scene.metadata?.caelusIntegratedRepairVersion ?? 0),
+        buildingCount: Number(scene.metadata?.caelusIntegratedBuildingCount ?? 0),
+        curbSegmentCount: Number(scene.metadata?.caelusIntegratedCurbSegments ?? 0),
+        junctionCount: Number(scene.metadata?.caelusIntegratedJunctionCount ?? 0),
+        removedCollision: Number(scene.metadata?.caelusIntegratedRemovedCollision ?? 0),
+        hiddenLegacyCount: hiddenLegacy.length,
+        enabledIntegratedCount: enabledIntegrated.length,
+        junctionAwareCurbCount: junctionAwareCurbs.length,
+        frontagePathCount: frontagePaths.length,
+        missingRequired: required.filter((name) => !scene.getMeshByName?.(name)?.isEnabled?.()),
+        transparentIntegratedMaterials,
+        swordForwardVerified: Boolean(scene.metadata?.caelusSwordForwardVerified),
+        swordForwardDotBeforeCorrection: Number(scene.metadata?.caelusSwordForwardDotBeforeCorrection ?? 0),
+        stableGuardInstalled: Boolean(scene.metadata?.caelusIntegratedStableGuard)
+      };
+    };
+
+    bridge.guardStabilityProbe = (seconds: number): Record<string, unknown> => {
+      const player = game.player as any;
+      const start = player.root.position.clone();
+      const frames = Math.max(1, Math.min(600, Math.ceil(seconds * 60)));
+      player.blocking = true;
+      for (let index = 0; index < frames; index += 1) {
+        game.world.scene.render();
+      }
+      const result = {
+        frames,
+        displacement: Number(BABYLON.Vector3.Distance(start, player.root.position).toFixed(5)),
+        rootPitch: Number(player.root.rotation.x.toFixed(5)),
+        rootRoll: Number(player.root.rotation.z.toFixed(5)),
+        hipPitch: Number(player.visual.hips.rotation.x.toFixed(5)),
+        hipRoll: Number(player.visual.hips.rotation.z.toFixed(5)),
+        torsoOffsetY: Number(player.visual.torso.position.y.toFixed(5))
+      };
+      player.blocking = false;
+      return result;
     };
   }
 }
