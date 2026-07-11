@@ -6,18 +6,43 @@ const requiredFiles = [
   "src/core/CaelusReferenceTownPolishDirector.ts",
   "src/core/CaelusRoofAlignmentDirector.ts",
   "src/core/CaelusRoadConnectivityDirector.ts",
+  "src/core/CaelusTownRefinementShared.ts",
+  "src/core/CaelusTownRoadRefinement.ts",
+  "src/core/CaelusTownHouseRefinement.ts",
+  "src/core/CaelusTownLandmarkRefinement.ts",
+  "src/core/CaelusTownRefinementDirector.ts",
   "tests/browser/caelus-reference-town.spec.mts",
   "tests/browser/combat-reference.spec.mts",
   "tests/browser/vertical-slice-reference.spec.mts"
 ];
 await Promise.all(requiredFiles.map((file) => access(file, constants.R_OK)));
 
-const [main, director, polish, roofs, connectivity, referenceTest, combatTest, routeTest, workflow] = await Promise.all([
+const [
+  main,
+  director,
+  polish,
+  roofs,
+  connectivity,
+  shared,
+  roadRefinement,
+  houseRefinement,
+  landmarkRefinement,
+  refinement,
+  referenceTest,
+  combatTest,
+  routeTest,
+  workflow
+] = await Promise.all([
   readFile("src/main.ts", "utf8"),
   readFile("src/core/CaelusReferenceTownDirector.ts", "utf8"),
   readFile("src/core/CaelusReferenceTownPolishDirector.ts", "utf8"),
   readFile("src/core/CaelusRoofAlignmentDirector.ts", "utf8"),
   readFile("src/core/CaelusRoadConnectivityDirector.ts", "utf8"),
+  readFile("src/core/CaelusTownRefinementShared.ts", "utf8"),
+  readFile("src/core/CaelusTownRoadRefinement.ts", "utf8"),
+  readFile("src/core/CaelusTownHouseRefinement.ts", "utf8"),
+  readFile("src/core/CaelusTownLandmarkRefinement.ts", "utf8"),
+  readFile("src/core/CaelusTownRefinementDirector.ts", "utf8"),
   readFile("tests/browser/caelus-reference-town.spec.mts", "utf8"),
   readFile("tests/browser/combat-reference.spec.mts", "utf8"),
   readFile("tests/browser/vertical-slice-reference.spec.mts", "utf8"),
@@ -29,6 +54,7 @@ const referenceIndex = main.indexOf("new CaelusReferenceTownDirector(game)");
 const polishIndex = main.indexOf("new CaelusReferenceTownPolishDirector(game)");
 const roofIndex = main.indexOf("new CaelusRoofAlignmentDirector(game)");
 const connectivityIndex = main.indexOf("new CaelusRoadConnectivityDirector(game)");
+const refinementIndex = main.indexOf("new CaelusTownRefinementDirector(game)");
 const surveyIndex = main.indexOf("new CaelusBaselineSurveyDirector(game)");
 if (
   bridgeIndex < 0
@@ -36,9 +62,10 @@ if (
   || polishIndex <= referenceIndex
   || roofIndex <= polishIndex
   || connectivityIndex <= roofIndex
-  || surveyIndex <= connectivityIndex
+  || refinementIndex <= connectivityIndex
+  || surveyIndex <= refinementIndex
 ) {
-  throw new Error("Reference town, polish, roof alignment, and road connectivity must install after PlaytestBridge and before city surveys.");
+  throw new Error("Reference town, roofs, roads, and final town refinement must install after PlaytestBridge and before city surveys.");
 }
 
 for (const feature of [
@@ -105,6 +132,24 @@ for (const feature of [
   if (!connectivity.includes(feature)) throw new Error(`Missing Set 1.4.2 road feature: ${feature}`);
 }
 
+const refinementSource = `${shared}\n${roadRefinement}\n${houseRefinement}\n${landmarkRefinement}\n${refinement}`;
+for (const feature of [
+  "Set 1 / Milestone 1.4.3 — Town Grounding and Civic Identity",
+  "ROAD_SURFACE_OFFSET = 0.018",
+  "QUEST_BOARD_POSITION",
+  "adventurers-guild",
+  "windscar-hall",
+  "riftiron-forge",
+  "caelus-refined-house-",
+  "transparentWindowPane",
+  "removedToPreventGateZFighting",
+  "removedForCleanReferenceGate",
+  "townRefinementAudit",
+  "caelus-refined-contract-board-root"
+]) {
+  if (!refinementSource.includes(feature)) throw new Error(`Missing Set 1.4.3 refinement feature: ${feature}`);
+}
+
 const houseDefinitions = director.match(/id: "(?:upper|middle|lower)-/g) ?? [];
 if (houseDefinitions.length !== 20) throw new Error(`Expected exactly 20 approved house definitions, found ${houseDefinitions.length}.`);
 
@@ -118,22 +163,22 @@ for (const assertion of [
   "expect(roofs.alignedRoofCount).toBe(20)",
   "expect(roofs.retiredLegacyRoofCount).toBe(20)",
   "expect(roofs.misalignedRoofCount).toBe(0)",
-  "expect(roofs.minimumOverhang).toBeGreaterThanOrEqual(0.75)",
-  "expect(roofs.maximumCenterOffset).toBeLessThanOrEqual(0.01)",
   "expect(connectivity.frontageRoadCount).toBe(21)",
   "expect(connectivity.junctionPatchCount).toBe(24)",
-  "expect(connectivity.disconnectedCollectorCount).toBe(0)",
-  "expect(connectivity.disconnectedFrontageCount).toBe(0)",
   "expect(connectivity.buriedSurfaceVertexCount).toBe(0)",
-  "expect(connectivity.minimumSurfaceClearance).toBeGreaterThanOrEqual(0.12)",
-  "expect(connectivity.northGateCovered).toBe(true)",
-  "expect(connectivity.southGateCovered).toBe(true)",
-  "reference-town-v2-top-down-roads-roofs",
-  "reference-town-v2-lower-road-connections",
-  "reference-town-v2-north-gate-road",
-  "reference-town-v2-house-roof-alignment"
+  "expect(refinement.terrainUpdated).toBe(true)",
+  "expect(refinement.roadMaterialCount).toBe(1)",
+  "expect(refinement.disabledGateApronCount).toBe(2)",
+  "expect(refinement.activeGhostGateMeshCount).toBe(0)",
+  "expect(refinement.specialBuildingCount).toBe(3)",
+  "expect(refinement.convertedHouseCount).toBe(20)",
+  "expect(refinement.transparentWindowPaneCount).toBe(40)",
+  "expect(refinement.activeGlowBlockWindowCount).toBe(0)",
+  "reference-town-v3-grounded-civic-overview",
+  "reference-town-v3-clean-south-gate",
+  "reference-town-v3-transparent-windows"
 ]) {
-  if (!referenceTest.includes(assertion)) throw new Error(`Missing Set 1.4.2 browser assertion: ${assertion}`);
+  if (!referenceTest.includes(assertion)) throw new Error(`Missing Set 1.4.3 browser assertion: ${assertion}`);
 }
 
 for (const feature of ["guardStabilityProbe", "swordForwardVerified", "referenceTownAudit"]) {
@@ -153,9 +198,9 @@ if (!workflow.includes("branches: [main, site-test]")) {
   throw new Error("Quality workflow must validate pull requests targeting both main and site-test.");
 }
 
-const combined = `${director}\n${polish}\n${roofs}\n${connectivity}\n${referenceTest}\n${combatTest}\n${routeTest}`.toLowerCase();
+const combined = `${director}\n${polish}\n${roofs}\n${connectivity}\n${refinementSource}\n${referenceTest}\n${combatTest}\n${routeTest}`.toLowerCase();
 for (const banned of ["placeholder asset", "replace later", "temporary asset", "todo:"]) {
   if (combined.includes(banned)) throw new Error(`Set 1.4 source contains banned marker: ${banned}`);
 }
 
-console.log("Project Ascension Set 1 Milestone 1.4.2 terrain-road and aligned-roof smoke checks passed.");
+console.log("Project Ascension Set 1 Milestone 1.4.3 town grounding and civic refinement smoke checks passed.");

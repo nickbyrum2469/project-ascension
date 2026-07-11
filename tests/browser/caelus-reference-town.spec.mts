@@ -65,6 +65,27 @@ interface RoofAlignmentAudit {
   pass: boolean;
 }
 
+interface TownRefinementAudit {
+  version: number;
+  milestone: string;
+  terrainUpdated: boolean;
+  groundedRoadMeshCount: number;
+  roadMaterialCount: number;
+  disabledGateApronCount: number;
+  minimumRoadLift: number;
+  maximumRoadLift: number;
+  removedGhostGateMeshCount: number;
+  activeGhostGateMeshCount: number;
+  questBoardPosition: { x: number; z: number };
+  questBoardRelocated: boolean;
+  specialBuildingCount: number;
+  specialBuildingIds: string[];
+  convertedHouseCount: number;
+  transparentWindowPaneCount: number;
+  activeGlowBlockWindowCount: number;
+  pass: boolean;
+}
+
 const bridgeCall = async <T>(page: Page, method: string, ...args: unknown[]): Promise<T> => page.evaluate(
   ({ methodName, values }) => {
     const bridge = (globalThis as any).__ASCENSION_PLAYTEST__;
@@ -99,7 +120,7 @@ const lockedView = async (
   await bridgeCall(page, "setPaused", false);
 };
 
-test("Set 1.4.2 has gap-free terrain roads and aligned full-footprint roofs", async ({ page }, testInfo) => {
+test("Set 1.4.3 grounds the town roads and adds civic identity without regressing the approved layout", async ({ page }, testInfo) => {
   const consoleErrors: string[] = [];
   page.on("pageerror", (error) => consoleErrors.push(`pageerror: ${error.message}`));
   page.on("console", (message) => {
@@ -161,6 +182,25 @@ test("Set 1.4.2 has gap-free terrain roads and aligned full-footprint roofs", as
   expect(connectivity.wellCanopyRemoved).toBe(true);
   expect(connectivity.pass).toBe(true);
 
+  const refinement = await bridgeCall<TownRefinementAudit>(page, "townRefinementAudit");
+  expect(refinement.version).toBe(1);
+  expect(refinement.milestone).toContain("Milestone 1.4.3");
+  expect(refinement.terrainUpdated).toBe(true);
+  expect(refinement.groundedRoadMeshCount).toBeGreaterThanOrEqual(49);
+  expect(refinement.roadMaterialCount).toBe(1);
+  expect(refinement.disabledGateApronCount).toBe(2);
+  expect(refinement.minimumRoadLift).toBeGreaterThanOrEqual(0.012);
+  expect(refinement.maximumRoadLift).toBeLessThanOrEqual(0.035);
+  expect(refinement.activeGhostGateMeshCount).toBe(0);
+  expect(refinement.questBoardPosition).toEqual({ x: 18, z: 52 });
+  expect(refinement.questBoardRelocated).toBe(true);
+  expect(refinement.specialBuildingCount).toBe(3);
+  expect(refinement.specialBuildingIds).toEqual(["adventurers-guild", "windscar-hall", "riftiron-forge"]);
+  expect(refinement.convertedHouseCount).toBe(20);
+  expect(refinement.transparentWindowPaneCount).toBe(40);
+  expect(refinement.activeGlowBlockWindowCount).toBe(0);
+  expect(refinement.pass).toBe(true);
+
   const alignedRoofMeshes = await bridgeCall<string[]>(page, "alignedRoofMeshes");
   expect(alignedRoofMeshes).toHaveLength(20);
   expect(alignedRoofMeshes.every((name) => name.startsWith("caelus-aligned-house-") && name.endsWith("-roof"))).toBe(true);
@@ -170,14 +210,24 @@ test("Set 1.4.2 has gap-free terrain roads and aligned full-footprint roofs", as
   expect(roadMeshes.filter((name) => name.startsWith("caelus-connected-v2-collector-"))).toHaveLength(3);
   expect(roadMeshes.filter((name) => name.startsWith("caelus-connected-v2-frontage-") && !name.includes("junction"))).toHaveLength(21);
   expect(roadMeshes.filter((name) => name.includes("frontage-junction-"))).toHaveLength(21);
-  expect(roadMeshes.filter((name) => name.endsWith("-gate-apron"))).toHaveLength(2);
+  expect(roadMeshes.filter((name) => name.endsWith("-gate-apron"))).toHaveLength(0);
+
+  const refinementMeshes = await bridgeCall<string[]>(page, "townRefinementMeshes");
+  for (const buildingId of ["adventurers-guild", "windscar-hall", "riftiron-forge"]) {
+    expect(refinementMeshes.some((name) => name === `caelus-special-${buildingId}-foundation`)).toBe(true);
+    expect(refinementMeshes.some((name) => name === `caelus-special-${buildingId}-ridge-roof`)).toBe(true);
+  }
+  expect(refinementMeshes).toContain("caelus-refined-contract-board-face");
 
   await lockedView(page, testInfo, "reference-town-v2-top-down-roads-roofs", [0, 121, 0], [0, 160, -0.01, 1.2]);
   await lockedView(page, testInfo, "reference-town-v2-lower-road-connections", [0, 70, 0], [0, 62, -0.01, 1.2]);
   await lockedView(page, testInfo, "reference-town-v2-north-gate-road", [0, 216, 0], [0, 30, -34, 1.2]);
   await lockedView(page, testInfo, "reference-town-v2-house-roof-alignment", [-55, 160, 0], [0, 48, -0.01, 1.2]);
+  await lockedView(page, testInfo, "reference-town-v3-grounded-civic-overview", [0, 121, 0], [0, 160, -0.01, 1.2]);
+  await lockedView(page, testInfo, "reference-town-v3-clean-south-gate", [0, 28, 0], [0, 28, -34, 1.2]);
+  await lockedView(page, testInfo, "reference-town-v3-transparent-windows", [-55, 160, 0], [0, 22, -18, 1.2]);
 
-  await writeFile(testInfo.outputPath("reference-town-audit.json"), JSON.stringify({ audit, polish, roofs, connectivity }, null, 2));
+  await writeFile(testInfo.outputPath("reference-town-audit.json"), JSON.stringify({ audit, polish, roofs, connectivity, refinement }, null, 2));
   const runtimeErrors = await bridgeCall<string[]>(page, "errors");
   expect(runtimeErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
