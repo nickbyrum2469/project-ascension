@@ -26,6 +26,15 @@ interface ReferenceTownAudit {
   pass: boolean;
 }
 
+interface ReferenceTownPolishAudit {
+  version: number;
+  pathColor: string;
+  gateTowerX: number;
+  gateClearWidth: number;
+  southGateZ: number;
+  northGateZ: number;
+}
+
 const bridgeCall = async <T>(page: Page, method: string, ...args: unknown[]): Promise<T> => page.evaluate(
   ({ methodName, values }) => {
     const bridge = (globalThis as any).__ASCENSION_PLAYTEST__;
@@ -95,17 +104,23 @@ test("Set 1.4 matches the approved straight-road walled-town reference", async (
   expect(audit.retiredMeshes).toBeGreaterThan(50);
   expect(audit.removedCollisionVolumes).toBeGreaterThan(10);
 
+  const polish = await bridgeCall<ReferenceTownPolishAudit>(page, "referenceTownPolishAudit");
+  expect(polish.version).toBe(1);
+  expect(polish.pathColor).toBe("#7f876f");
+  expect(polish.gateTowerX).toBe(13);
+  expect(polish.gateClearWidth).toBeGreaterThan(16);
+
   const meshes = await bridgeCall<string[]>(page, "referenceTownMeshes");
   expect(meshes.some((name) => name === "caelus-reference-main-street-road-surface")).toBe(true);
   expect(meshes.filter((name) => name.includes("-body")).length).toBe(20);
   expect(meshes.some((name) => name === "caelus-reference-well-dark-shaft")).toBe(true);
 
-  await lockedView(page, testInfo, "reference-town-aerial", [0, 121, 0], [0, 136, 98, 1.3]);
-  await lockedView(page, testInfo, "reference-town-south-gate", [0, 28, 0], [0, 13, -24, 2]);
-  await lockedView(page, testInfo, "reference-town-north-gate", [0, 214, 0], [0, 13, 24, 2]);
-  await lockedView(page, testInfo, "reference-town-upper-left-well", [-91, 207, 0], [13, 10, -15, 2]);
+  await lockedView(page, testInfo, "reference-town-aerial", [0, 121, 0], [0, 136, -98, 1.3]);
+  await lockedView(page, testInfo, "reference-town-south-gate", [0, 44, 0], [0, 8, -34, 2]);
+  await lockedView(page, testInfo, "reference-town-north-gate", [0, 204, 0], [0, 8, 36, 2]);
+  await lockedView(page, testInfo, "reference-town-upper-left-well", [-78, 197, 0], [-14, 10, -13, 2]);
 
-  await writeFile(testInfo.outputPath("reference-town-audit.json"), JSON.stringify(audit, null, 2));
+  await writeFile(testInfo.outputPath("reference-town-audit.json"), JSON.stringify({ audit, polish }, null, 2));
   const runtimeErrors = await bridgeCall<string[]>(page, "errors");
   expect(runtimeErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
