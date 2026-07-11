@@ -1,7 +1,7 @@
 {
   "channel": "latest-test-build",
-  "sourceSha": "49646ee38d48b84d91ee326366f7458896648068",
-  "shortSha": "49646ee38d48",
-  "publishedAt": "2026-07-11T06:32:51Z",
+  "sourceSha": "9f27a9d04ce5926af9e050fa96c3d6c57b61af57",
+  "shortSha": "9f27a9d04ce5",
+  "publishedAt": "2026-07-11T06:40:25Z",
   "sourceRef": "milestone-21/set-1-3-controlled-terrain"
 }
