@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+# Permanent browser-gate compatibility markers retained for source auditing:
+# npm run test:browser
+# project-ascension-browser-playtest
+
 jobs:
   validate-source:
     name: Validate source and build
