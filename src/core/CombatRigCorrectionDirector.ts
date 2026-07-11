@@ -10,7 +10,7 @@ export class CombatRigCorrectionDirector {
   private lastForwardDot = 0;
   private guardFrames = 0;
 
-  constructor(private readonly game: any) {
+  constructor(game: any) {
     this.scene = game.world.scene;
     this.player = game.player;
     this.visual = game.player.visual;
