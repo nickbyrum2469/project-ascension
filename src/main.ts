@@ -10,6 +10,7 @@ import { CaelusMigrationCompatibility } from "./core/CaelusMigrationCompatibilit
 import { CaelusPhaseTwoPlaytestExtension } from "./core/CaelusPhaseTwoPlaytestExtension.js";
 import { CaelusPhaseZeroDirector } from "./core/CaelusPhaseZeroDirector.js";
 import { CaelusReferenceTownDirector } from "./core/CaelusReferenceTownDirector.js";
+import { CaelusReferenceTownPolishDirector } from "./core/CaelusReferenceTownPolishDirector.js";
 import { installCaelusTownPhaseOne } from "./core/CaelusTownPhaseOne.js";
 import { CaelusTownBoundaryDirector } from "./core/CaelusTownBoundaryDirector.js";
 import { CaelusTownPhaseTwo } from "./core/CaelusTownPhaseTwo.js";
@@ -217,6 +218,7 @@ const boot = async (): Promise<void> => {
     new PlaytestBridge(game, renderer);
     new CaelusControlledTerrainDirector(game);
     new CaelusReferenceTownDirector(game);
+    new CaelusReferenceTownPolishDirector(game);
     new CaelusBaselineSurveyDirector(game);
     new CaelusTownBoundaryDirector(game);
     new CaelusPhaseTwoPlaytestExtension(game);
