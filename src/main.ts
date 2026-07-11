@@ -7,6 +7,7 @@ import { CaelusIntegratedRepairDirector } from "./core/CaelusIntegratedRepairDir
 import { CaelusMigrationCompatibility } from "./core/CaelusMigrationCompatibility.js";
 import { CaelusPhaseTwoPlaytestExtension } from "./core/CaelusPhaseTwoPlaytestExtension.js";
 import { CaelusPhaseZeroDirector } from "./core/CaelusPhaseZeroDirector.js";
+import { CaelusTownBoundaryDirector } from "./core/CaelusTownBoundaryDirector.js";
 import { installCaelusTownPhaseOne } from "./core/CaelusTownPhaseOne.js";
 import { CaelusTownPhaseTwo } from "./core/CaelusTownPhaseTwo.js";
 import { CameraSafetyDirector } from "./core/CameraSafetyDirector.js";
@@ -209,6 +210,7 @@ const boot = async (): Promise<void> => {
     new CameraSafetyDirector(game);
     new RouteAudioDirector(game);
     new PlaytestBridge(game, renderer);
+    new CaelusTownBoundaryDirector(game);
     new CaelusBaselineSurveyDirector(game);
     new CaelusPhaseTwoPlaytestExtension(game);
     game.run();

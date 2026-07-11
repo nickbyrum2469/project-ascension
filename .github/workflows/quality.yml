@@ -68,6 +68,8 @@ jobs:
             file: tests/browser/caelus-phase-two.spec.mts
           - name: baseline-survey
             file: tests/browser/caelus-baseline-survey.spec.mts
+          - name: town-boundary
+            file: tests/browser/caelus-town-boundary.spec.mts
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
