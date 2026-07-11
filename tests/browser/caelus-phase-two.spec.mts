@@ -138,7 +138,6 @@ test("Caelus integrated city and combat repair is production-safe", async ({ pag
   expect(start.started).toBe(true);
   expect(start.cameraMode).toBe("third");
 
-  // Preserve the Phase 2 production contract while confirming its retired visuals remain hidden audit-only meshes.
   const audit = await bridgeCall<PhaseTwoAudit>(page, "phaseTwoAudit");
   expect(audit.version).toBe(1);
   expect(audit.roadVisualRevision).toBe(3);
@@ -172,10 +171,10 @@ test("Caelus integrated city and combat repair is production-safe", async ({ pag
   expect(integrated.stableGuardInstalled).toBe(true);
 
   const probes: Array<[string, [number, number, number, number]]> = [
-    ["east", [-14, 118, -18, 118]],
-    ["west", [-28, 118, -24, 118]],
-    ["south", [-21, 111, -21, 115]],
-    ["north", [-21, 125, -21, 121]]
+    ["east", [-14, 118, -19, 118]],
+    ["west", [-28, 118, -23, 118]],
+    ["south", [-21, 111, -21, 116]],
+    ["north", [-21, 125, -21, 120]]
   ];
   const probeEvidence: Record<string, CollisionProbe> = {};
   for (const [name, values] of probes) {
@@ -202,48 +201,12 @@ test("Caelus integrated city and combat repair is production-safe", async ({ pag
   expect(Math.abs(guard.hipRoll)).toBeLessThan(0.001);
   expect(Math.abs(guard.torsoOffsetY)).toBeLessThan(0.001);
 
-  await captureLockedView(
-    page,
-    testInfo,
-    "phase2-main-road-drainage",
-    [0, 91, 0],
-    [13, 8, -15, 1.8]
-  );
-  await captureLockedView(
-    page,
-    testInfo,
-    "phase2-relocated-town-well",
-    [-21, 118, 0],
-    [11, 8, -13, 2.2]
-  );
-  await captureLockedView(
-    page,
-    testInfo,
-    "phase2-market-lane-drainage",
-    [-49, 121, -0.8],
-    [14, 9, -15, 1.8]
-  );
-  await captureLockedView(
-    page,
-    testInfo,
-    "phase2-guild-lane-drainage",
-    [50, 130, 0.8],
-    [-15, 9, -15, 2]
-  );
-  await captureLockedView(
-    page,
-    testInfo,
-    "integrated-gate-close",
-    [0, 8, 0],
-    [16, 9, -18, 6]
-  );
-  await captureLockedView(
-    page,
-    testInfo,
-    "integrated-main-junction-close",
-    [0, 103, 0],
-    [11, 7, -12, 1.4]
-  );
+  await captureLockedView(page, testInfo, "phase2-main-road-drainage", [0, 91, 0], [13, 8, -15, 1.8]);
+  await captureLockedView(page, testInfo, "phase2-relocated-town-well", [-21, 118, 0], [11, 8, -13, 2.2]);
+  await captureLockedView(page, testInfo, "phase2-market-lane-drainage", [-49, 121, -0.8], [14, 9, -15, 1.8]);
+  await captureLockedView(page, testInfo, "phase2-guild-lane-drainage", [50, 130, 0.8], [-15, 9, -15, 2]);
+  await captureLockedView(page, testInfo, "integrated-gate-close", [0, 8, 0], [16, 9, -18, 6]);
+  await captureLockedView(page, testInfo, "integrated-main-junction-close", [0, 103, 0], [11, 7, -12, 1.4]);
 
   await bridgeCall(page, "teleport", 12, 112, 0);
   await bridgeCall(page, "setPaused", false);
