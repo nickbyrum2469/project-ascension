@@ -1,7 +1,7 @@
 {
   "channel": "latest-test-build",
-  "sourceSha": "27d862e45b51974a02a5fdd20f6dea902b9c59aa",
-  "shortSha": "27d862e45b51",
-  "publishedAt": "2026-07-11T06:03:57Z",
+  "sourceSha": "3d78d0a1b5e5cb2806a560d9dab33de63cdf97e7",
+  "shortSha": "3d78d0a1b5e5",
+  "publishedAt": "2026-07-11T06:09:02Z",
   "sourceRef": "milestone-21/set-1-2-final-town-boundary"
 }
