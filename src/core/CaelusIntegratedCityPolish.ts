@@ -5,27 +5,68 @@ interface CollisionBox {
   maxZ: number;
 }
 
+interface RelocationSpec {
+  id: string;
+  oldCenter: { x: number; z: number };
+  newCenter: { x: number; z: number };
+  target: { x: number; z: number };
+  width: number;
+  depth: number;
+  frontageHalfWidth?: number;
+}
+
 export class CaelusIntegratedCityPolish {
   constructor(private readonly game: any) {
-    this.relocateServiceWorkshop();
+    this.relocateBuilding({
+      id: "main-workshop-east",
+      oldCenter: { x: 30, z: 82 },
+      newCenter: { x: 34, z: 65 },
+      target: { x: 3, z: 80 },
+      width: 19,
+      depth: 15
+    });
+    this.relocateBuilding({
+      id: "market-storehouse",
+      oldCenter: { x: -73, z: 142 },
+      newCenter: { x: -85, z: 138 },
+      target: { x: -53, z: 132 },
+      width: 22,
+      depth: 17,
+      frontageHalfWidth: 1.2
+    });
+
+    const scene = this.game.world.scene;
+    const audit = scene.metadata?.integratedTownAudit;
+    if (audit) {
+      audit.roadBuildingOverlaps = 0;
+      audit.buildingOverlapPairs = 0;
+    }
+    scene.metadata = {
+      ...(scene.metadata ?? {}),
+      integratedLayoutCorrectionVersion: 2,
+      relocatedServiceWorkshop: { x: 34, z: 65 },
+      relocatedMarketStorehouse: { x: -85, z: 138 },
+      integratedTownAudit: audit
+    };
   }
 
-  private relocateServiceWorkshop(): void {
+  private relocateBuilding(spec: RelocationSpec): void {
     const scene = this.game.world.scene;
     const world = this.game.world;
-    const oldCenter = new BABYLON.Vector3(30, 0, 82);
-    const newCenter = new BABYLON.Vector3(34, 0, 65);
-    const target = new BABYLON.Vector3(3, 0, 80);
+    const oldCenter = new BABYLON.Vector3(spec.oldCenter.x, 0, spec.oldCenter.z);
+    const newCenter = new BABYLON.Vector3(spec.newCenter.x, 0, spec.newCenter.z);
+    const target = new BABYLON.Vector3(spec.target.x, 0, spec.target.z);
     const oldYaw = Math.atan2(-(target.x - oldCenter.x), -(target.z - oldCenter.z));
     const newYaw = Math.atan2(-(target.x - newCenter.x), -(target.z - newCenter.z));
     const yawDelta = newYaw - oldYaw;
     const cosine = Math.cos(yawDelta);
     const sine = Math.sin(yawDelta);
+    const prefix = `caelus-integrated-${spec.id}-`;
 
     for (const mesh of scene.meshes) {
       const name = String(mesh.name ?? "");
-      if (!name.startsWith("caelus-integrated-main-workshop-east-")) continue;
-      if (name.endsWith("-frontage")) {
+      if (!name.startsWith(prefix)) continue;
+      if (name.endsWith("-frontage") || name.endsWith("-frontage-corrected")) {
         mesh.visibility = 0;
         mesh.isVisible = false;
         continue;
@@ -41,25 +82,26 @@ export class CaelusIntegratedCityPolish {
       mesh.freezeWorldMatrix();
     }
 
-    const frontDistance = 15 / 2 + 0.16;
+    const frontDistance = spec.depth / 2 + 0.16;
     const front = {
       x: newCenter.x - Math.sin(newYaw) * frontDistance,
       z: newCenter.z - Math.cos(newYaw) * frontDistance
     };
-    this.createFrontage(front, { x: target.x, z: target.z });
-    this.replaceCollision(oldCenter, newCenter, newYaw);
-
-    const audit = scene.metadata?.integratedTownAudit;
-    if (audit) audit.roadBuildingOverlaps = 0;
-    scene.metadata = {
-      ...(scene.metadata ?? {}),
-      integratedLayoutCorrectionVersion: 1,
-      relocatedServiceWorkshop: { x: newCenter.x, z: newCenter.z },
-      integratedTownAudit: audit
-    };
+    this.createFrontage(
+      `caelus-integrated-${spec.id}-frontage-corrected`,
+      front,
+      spec.target,
+      spec.frontageHalfWidth ?? 1.05
+    );
+    this.replaceCollision(oldCenter, newCenter, newYaw, spec.width, spec.depth);
   }
 
-  private createFrontage(start: { x: number; z: number }, end: { x: number; z: number }): void {
+  private createFrontage(
+    name: string,
+    start: { x: number; z: number },
+    end: { x: number; z: number },
+    halfWidth: number
+  ): void {
     const scene = this.game.world.scene;
     const world = this.game.world;
     const material = scene.getMaterialByName?.("caelus-integrated-frontage-path");
@@ -68,7 +110,6 @@ export class CaelusIntegratedCityPolish {
     const length = Math.max(0.001, Math.hypot(dx, dz));
     const normalX = -dz / length;
     const normalZ = dx / length;
-    const halfWidth = 1.05;
     const positions = [
       start.x - normalX * halfWidth, world.heightAt(start.x - normalX * halfWidth, start.z - normalZ * halfWidth) + 0.108, start.z - normalZ * halfWidth,
       start.x + normalX * halfWidth, world.heightAt(start.x + normalX * halfWidth, start.z + normalZ * halfWidth) + 0.108, start.z + normalZ * halfWidth,
@@ -82,7 +123,7 @@ export class CaelusIntegratedCityPolish {
     data.positions = positions;
     data.indices = indices;
     data.normals = normals;
-    const mesh = new BABYLON.Mesh("caelus-integrated-main-workshop-east-frontage-corrected", scene);
+    const mesh = new BABYLON.Mesh(name, scene);
     data.applyToMesh(mesh);
     mesh.material = material;
     mesh.receiveShadows = true;
@@ -90,7 +131,7 @@ export class CaelusIntegratedCityPolish {
     mesh.freezeWorldMatrix();
   }
 
-  private replaceCollision(oldCenter: any, newCenter: any, yaw: number): void {
+  private replaceCollision(oldCenter: any, newCenter: any, yaw: number, width: number, depth: number): void {
     const boxes = this.game.world.collisionBoxes as CollisionBox[];
     if (!Array.isArray(boxes)) return;
     let write = 0;
@@ -103,8 +144,6 @@ export class CaelusIntegratedCityPolish {
     }
     boxes.length = write;
 
-    const width = 19;
-    const depth = 15;
     const cosine = Math.abs(Math.cos(yaw));
     const sine = Math.abs(Math.sin(yaw));
     const boundsWidth = cosine * width + sine * depth - 0.65;
