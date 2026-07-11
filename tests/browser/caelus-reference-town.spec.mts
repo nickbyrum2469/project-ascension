@@ -36,6 +36,18 @@ interface ReferenceTownPolishAudit {
   northGateZ: number;
 }
 
+interface RoadConnectivityAudit {
+  version: number;
+  milestone: string;
+  mainRoadWidth: number;
+  collectorRoadCount: number;
+  frontageConnectorCount: number;
+  disconnectedCollectorCount: number;
+  disconnectedFrontageCount: number;
+  wellCanopyRemoved: boolean;
+  pass: boolean;
+}
+
 const bridgeCall = async <T>(page: Page, method: string, ...args: unknown[]): Promise<T> => page.evaluate(
   ({ methodName, values }) => {
     const bridge = (globalThis as any).__ASCENSION_PLAYTEST__;
@@ -70,7 +82,7 @@ const lockedView = async (
   await bridgeCall(page, "setPaused", false);
 };
 
-test("Set 1.4 matches the approved straight-road walled-town reference", async ({ page }, testInfo) => {
+test("Set 1.4.1 has a visible connected road network and open-frame well", async ({ page }, testInfo) => {
   const consoleErrors: string[] = [];
   page.on("pageerror", (error) => consoleErrors.push(`pageerror: ${error.message}`));
   page.on("console", (message) => {
@@ -107,22 +119,36 @@ test("Set 1.4 matches the approved straight-road walled-town reference", async (
 
   const polish = await bridgeCall<ReferenceTownPolishAudit>(page, "referenceTownPolishAudit");
   expect(polish.version).toBe(2);
-  expect(polish.pathColor).toBe("#68705d");
-  expect(polish.roadColor).toBe("#18211f");
   expect(polish.gateTowerX).toBe(13);
   expect(polish.gateClearWidth).toBeGreaterThan(16);
 
+  const connectivity = await bridgeCall<RoadConnectivityAudit>(page, "roadConnectivityAudit");
+  expect(connectivity.version).toBe(1);
+  expect(connectivity.milestone).toContain("Milestone 1.4.1");
+  expect(connectivity.mainRoadWidth).toBe(18);
+  expect(connectivity.collectorRoadCount).toBe(3);
+  expect(connectivity.frontageConnectorCount).toBe(21);
+  expect(connectivity.disconnectedCollectorCount).toBe(0);
+  expect(connectivity.disconnectedFrontageCount).toBe(0);
+  expect(connectivity.wellCanopyRemoved).toBe(true);
+  expect(connectivity.pass).toBe(true);
+
   const meshes = await bridgeCall<string[]>(page, "referenceTownMeshes");
-  expect(meshes.some((name) => name === "caelus-reference-main-street-road-surface")).toBe(true);
   expect(meshes.filter((name) => name.includes("-body")).length).toBe(20);
   expect(meshes.some((name) => name === "caelus-reference-well-dark-shaft")).toBe(true);
+  expect(meshes.some((name) => name === "caelus-reference-well-canopy")).toBe(false);
 
-  await lockedView(page, testInfo, "reference-town-aerial", [0, 121, 0], [0, 136, -98, 1.3]);
-  await lockedView(page, testInfo, "reference-town-south-gate", [0, 44, 0], [0, 8, -34, 2]);
-  await lockedView(page, testInfo, "reference-town-north-gate", [0, 204, 0], [0, 8, 36, 2]);
-  await lockedView(page, testInfo, "reference-town-upper-left-well", [-78, 197, 0], [-14, 10, -13, 2]);
+  const roadMeshes = await bridgeCall<string[]>(page, "roadConnectivityMeshes");
+  expect(roadMeshes.some((name) => name === "caelus-connected-main-road")).toBe(true);
+  expect(roadMeshes.filter((name) => name.startsWith("caelus-connected-collector-")).length).toBe(3);
+  expect(roadMeshes.filter((name) => name.startsWith("caelus-connected-frontage-junction-")).length).toBe(21);
 
-  await writeFile(testInfo.outputPath("reference-town-audit.json"), JSON.stringify({ audit, polish }, null, 2));
+  await lockedView(page, testInfo, "reference-town-connected-road-aerial", [0, 121, 0], [0, 136, -98, 1.3]);
+  await lockedView(page, testInfo, "reference-town-connected-road-street", [0, 66, 0], [0, 7, -25, 2]);
+  await lockedView(page, testInfo, "reference-town-connected-paths", [-52, 124, 0], [15, 10, -12, 2]);
+  await lockedView(page, testInfo, "reference-town-open-well", [-78, 197, 0], [-14, 10, -13, 2]);
+
+  await writeFile(testInfo.outputPath("reference-town-audit.json"), JSON.stringify({ audit, polish, connectivity }, null, 2));
   const runtimeErrors = await bridgeCall<string[]>(page, "errors");
   expect(runtimeErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
