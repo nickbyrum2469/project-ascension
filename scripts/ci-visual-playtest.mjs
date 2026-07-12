@@ -99,6 +99,7 @@ try {
   await page.goto(report.url, { waitUntil: "domcontentloaded", timeout: 120_000 });
   await page.waitForFunction(
     () => document.documentElement.dataset.playtestReady === "true" && Boolean(globalThis.__ASCENSION_PLAYTEST__),
+    null,
     { timeout: 180_000 }
   );
 
