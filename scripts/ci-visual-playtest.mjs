@@ -174,6 +174,7 @@ try {
 
   await evaluateApi("clearCameraPose", []);
   await evaluateApi("setView", "third");
+  await evaluateApi("setPaused", false);
   await evaluateApi("checkpoint", "gate-exterior");
   const beforeForward = await evaluateApi("snapshot", []);
   const afterForward = await evaluateApi("simulate", [1.5, ["KeyW"]]);
