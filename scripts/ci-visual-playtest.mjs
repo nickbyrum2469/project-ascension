@@ -25,6 +25,26 @@ const context = await browser.newContext({
   deviceScaleFactor: 1
 });
 
+// Chromium's headless AudioContext can remain suspended forever even after a
+// synthetic Playwright click. Keep the real context, but cap resume() so the
+// Begin Expedition handler can continue into the actual rendered game.
+await context.addInitScript(() => {
+  const AudioContextClass = globalThis.AudioContext ?? globalThis.webkitAudioContext;
+  if (!AudioContextClass?.prototype?.resume) return;
+  const nativeResume = AudioContextClass.prototype.resume;
+  AudioContextClass.prototype.resume = function resumeForVisualPlaytest() {
+    try {
+      const nativeResult = nativeResume.call(this);
+      return Promise.race([
+        Promise.resolve(nativeResult).catch(() => undefined),
+        new Promise((resolve) => globalThis.setTimeout(resolve, 150))
+      ]);
+    } catch {
+      return Promise.resolve();
+    }
+  };
+});
+
 const page = await context.newPage();
 const browserErrors = [];
 const consoleMessages = [];
@@ -85,8 +105,10 @@ try {
   report.renderer = await page.evaluate(() => globalThis.__ASCENSION_PLAYTEST__.renderer);
 
   const enterButton = page.locator("#enter-world");
-  if (await enterButton.isVisible()) await enterButton.click();
-  await page.waitForSelector("#hud:not(.hidden)", { timeout: 30_000 });
+  if (await enterButton.isVisible()) {
+    await enterButton.click({ force: true, timeout: 15_000 });
+  }
+  await page.waitForSelector("#hud:not(.hidden)", { timeout: 60_000 });
   await page.waitForTimeout(1_500);
 
   await evaluateApi("setPaused", true);
