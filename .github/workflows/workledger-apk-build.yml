@@ -4,7 +4,7 @@ on:
   push:
     branches: [workledger-apk-build]
     paths:
-      - 'workledger-build/**'
+      - 'workledger-build-v11/**'
       - '.github/workflows/workledger-apk-build.yml'
   workflow_dispatch:
 
@@ -23,7 +23,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/workledger-src
-          cat workledger-build/part*.b64 | tr -d '\n\r ' | base64 -d > /tmp/workledger.tar.xz
+          cat workledger-build-v11/part*.b64 | tr -d '\n\r ' | base64 -d > /tmp/workledger.tar.xz
           tar -xJf /tmp/workledger.tar.xz -C /tmp/workledger-src
           test -f /tmp/workledger-src/android/app/build.gradle
           test -f /tmp/workledger-src/android/app/src/main/AndroidManifest.xml
@@ -55,13 +55,13 @@ jobs:
       - name: Prepare APK
         shell: bash
         run: |
-          cp /tmp/workledger-src/android/app/build/outputs/apk/debug/app-debug.apk WorkLedger.apk
-          sha256sum WorkLedger.apk
+          cp /tmp/workledger-src/android/app/build/outputs/apk/debug/app-debug.apk WorkLedger-v1.1.apk
+          sha256sum WorkLedger-v1.1.apk
 
       - name: Upload WorkLedger APK
         uses: actions/upload-artifact@v4
         with:
-          name: WorkLedger-APK
-          path: WorkLedger.apk
+          name: WorkLedger-v1.1-APK
+          path: WorkLedger-v1.1.apk
           if-no-files-found: error
           retention-days: 30
