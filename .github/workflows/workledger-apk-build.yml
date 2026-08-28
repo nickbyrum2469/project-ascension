@@ -1,10 +1,10 @@
-name: Build WorkLedger APK
+name: Build WorkLedger v1.2 APK
 
 on:
   push:
     branches: [workledger-apk-build]
     paths:
-      - 'workledger-build-v11/**'
+      - 'workledger-build-v12/**'
       - '.github/workflows/workledger-apk-build.yml'
   workflow_dispatch:
 
@@ -18,15 +18,20 @@ jobs:
       - name: Check out build branch
         uses: actions/checkout@v4
 
-      - name: Reconstruct WorkLedger Android source
+      - name: Reconstruct and verify WorkLedger source
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/workledger-src
-          cat workledger-build-v11/part*.b64 | tr -d '\n\r ' | base64 -d > /tmp/workledger.tar.xz
+          cat workledger-build-v12/part*.b64 | tr -d '\n\r ' | base64 -d > /tmp/workledger.tar.xz
+          xz -t /tmp/workledger.tar.xz
           tar -xJf /tmp/workledger.tar.xz -C /tmp/workledger-src
           test -f /tmp/workledger-src/android/app/build.gradle
           test -f /tmp/workledger-src/android/app/src/main/AndroidManifest.xml
+          test -f /tmp/workledger-src/android/app/src/main/assets/app.js
+          grep -q "versionName '1.2.0'" /tmp/workledger-src/android/app/build.gradle
+          grep -q "2026-08-28T08:00" /tmp/workledger-src/android/app/src/main/assets/app.js
+          grep -q "linked-rate pay engine" /tmp/workledger-src/android/app/src/main/assets/app.js
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -48,20 +53,31 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      - name: Build installable debug APK
+      - name: Compile release APK
         working-directory: /tmp/workledger-src/android
-        run: gradle assembleDebug --stacktrace
+        run: gradle assembleRelease --stacktrace
 
-      - name: Prepare APK
+      - name: Package unsigned APK and official signing tools
         shell: bash
         run: |
-          cp /tmp/workledger-src/android/app/build/outputs/apk/debug/app-debug.apk WorkLedger-v1.1.apk
-          sha256sum WorkLedger-v1.1.apk
+          set -euo pipefail
+          cp /tmp/workledger-src/android/app/build/outputs/apk/release/app-release-unsigned.apk WorkLedger-v1.2-unsigned.apk
+          mkdir -p android-sign-tools/lib
+          cp "$ANDROID_HOME/build-tools/35.0.0/apksigner" android-sign-tools/
+          cp "$ANDROID_HOME/build-tools/35.0.0/zipalign" android-sign-tools/
+          cp "$ANDROID_HOME/build-tools/35.0.0/aapt2" android-sign-tools/
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" android-sign-tools/lib/
+          chmod +x android-sign-tools/apksigner android-sign-tools/zipalign android-sign-tools/aapt2
+          zip -qr Android-signing-tools.zip android-sign-tools
+          unzip -t WorkLedger-v1.2-unsigned.apk
+          sha256sum WorkLedger-v1.2-unsigned.apk Android-signing-tools.zip
 
-      - name: Upload WorkLedger APK
+      - name: Upload WorkLedger build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: WorkLedger-v1.1-APK
-          path: WorkLedger-v1.1.apk
+          name: WorkLedger-v1.2-Unsigned-And-Tools
+          path: |
+            WorkLedger-v1.2-unsigned.apk
+            Android-signing-tools.zip
           if-no-files-found: error
           retention-days: 30
