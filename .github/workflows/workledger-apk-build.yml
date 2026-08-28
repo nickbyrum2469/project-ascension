@@ -62,12 +62,14 @@ jobs:
         run: |
           set -euo pipefail
           cp /tmp/workledger-src/android/app/build/outputs/apk/release/app-release-unsigned.apk WorkLedger-v1.2-unsigned.apk
-          mkdir -p android-sign-tools/lib
+          mkdir -p android-sign-tools/lib android-sign-tools/lib64
           cp "$ANDROID_HOME/build-tools/35.0.0/apksigner" android-sign-tools/
           cp "$ANDROID_HOME/build-tools/35.0.0/zipalign" android-sign-tools/
           cp "$ANDROID_HOME/build-tools/35.0.0/aapt2" android-sign-tools/
           cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" android-sign-tools/lib/
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib64/libc++.so" android-sign-tools/lib64/
           chmod +x android-sign-tools/apksigner android-sign-tools/zipalign android-sign-tools/aapt2
+          LD_LIBRARY_PATH="$PWD/android-sign-tools/lib64" android-sign-tools/zipalign -c -v 4 WorkLedger-v1.2-unsigned.apk || true
           zip -qr Android-signing-tools.zip android-sign-tools
           unzip -t WorkLedger-v1.2-unsigned.apk
           sha256sum WorkLedger-v1.2-unsigned.apk Android-signing-tools.zip
