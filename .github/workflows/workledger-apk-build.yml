@@ -1,10 +1,10 @@
-name: Build WorkLedger v1.2 APK
+name: Build WorkLedger v1.3 APK
 
 on:
   push:
     branches: [workledger-apk-build]
     paths:
-      - 'workledger-build-v12/**'
+      - 'workledger-build-v13/**'
       - '.github/workflows/workledger-apk-build.yml'
   workflow_dispatch:
 
@@ -18,20 +18,25 @@ jobs:
       - name: Check out build branch
         uses: actions/checkout@v4
 
-      - name: Reconstruct and verify WorkLedger source
+      - name: Reconstruct and verify WorkLedger v1.3 source
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/workledger-src
-          cat workledger-build-v12/part*.b64 | tr -d '\n\r ' | base64 -d > /tmp/workledger.tar.xz
+          cat workledger-build-v13/part*.b64 | tr -d '\n\r ' | base64 -d > /tmp/workledger.tar.xz
+          echo 'a44e8a59ba9d6034e613ff09b6c2716741d5ea2e045af3b04de1defb11be1df8  /tmp/workledger.tar.xz' | sha256sum -c -
           xz -t /tmp/workledger.tar.xz
           tar -xJf /tmp/workledger.tar.xz -C /tmp/workledger-src
           test -f /tmp/workledger-src/android/app/build.gradle
           test -f /tmp/workledger-src/android/app/src/main/AndroidManifest.xml
           test -f /tmp/workledger-src/android/app/src/main/assets/app.js
-          grep -q "versionName '1.2.0'" /tmp/workledger-src/android/app/build.gradle
-          grep -q "2026-08-28T08:00" /tmp/workledger-src/android/app/src/main/assets/app.js
-          grep -q "linked-rate pay engine" /tmp/workledger-src/android/app/src/main/assets/app.js
+          grep -q "versionName '1.3.0'" /tmp/workledger-src/android/app/build.gradle
+          grep -q "const APP_VERSION = 3" /tmp/workledger-src/android/app/src/main/assets/app.js
+          grep -q "jobFilter:'all'" /tmp/workledger-src/android/app/src/main/assets/app.js
+          grep -q "shift-end-date" /tmp/workledger-src/android/app/src/main/assets/app.js
+          grep -q "Pagosa pro movers" /tmp/workledger-src/android/app/src/main/assets/app.js
+          grep -q "2026-09-02T08:45" /tmp/workledger-src/android/app/src/main/assets/app.js
+          grep -q "2026-09-02T17:56" /tmp/workledger-src/android/app/src/main/assets/app.js
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -53,15 +58,15 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      - name: Compile release APK
+      - name: Compile WorkLedger v1.3 release APK
         working-directory: /tmp/workledger-src/android
         run: gradle assembleRelease --stacktrace
 
-      - name: Package unsigned APK and official signing tools
+      - name: Package unsigned APK and Android signing tools
         shell: bash
         run: |
           set -euo pipefail
-          cp /tmp/workledger-src/android/app/build/outputs/apk/release/app-release-unsigned.apk WorkLedger-v1.2-unsigned.apk
+          cp /tmp/workledger-src/android/app/build/outputs/apk/release/app-release-unsigned.apk WorkLedger-v1.3-unsigned.apk
           mkdir -p android-sign-tools/lib android-sign-tools/lib64
           cp "$ANDROID_HOME/build-tools/35.0.0/apksigner" android-sign-tools/
           cp "$ANDROID_HOME/build-tools/35.0.0/zipalign" android-sign-tools/
@@ -69,17 +74,17 @@ jobs:
           cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" android-sign-tools/lib/
           cp "$ANDROID_HOME/build-tools/35.0.0/lib64/libc++.so" android-sign-tools/lib64/
           chmod +x android-sign-tools/apksigner android-sign-tools/zipalign android-sign-tools/aapt2
-          LD_LIBRARY_PATH="$PWD/android-sign-tools/lib64" android-sign-tools/zipalign -c -v 4 WorkLedger-v1.2-unsigned.apk || true
-          zip -qr Android-signing-tools.zip android-sign-tools
-          unzip -t WorkLedger-v1.2-unsigned.apk
-          sha256sum WorkLedger-v1.2-unsigned.apk Android-signing-tools.zip
+          LD_LIBRARY_PATH="$PWD/android-sign-tools/lib64" android-sign-tools/zipalign -c -v 4 WorkLedger-v1.3-unsigned.apk || true
+          zip -qr Android-signing-tools-v1.3.zip android-sign-tools
+          unzip -t WorkLedger-v1.3-unsigned.apk
+          sha256sum WorkLedger-v1.3-unsigned.apk Android-signing-tools-v1.3.zip
 
-      - name: Upload WorkLedger build artifact
+      - name: Upload WorkLedger v1.3 build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: WorkLedger-v1.2-Unsigned-And-Tools
+          name: WorkLedger-v1.3-Unsigned-And-Tools
           path: |
-            WorkLedger-v1.2-unsigned.apk
-            Android-signing-tools.zip
+            WorkLedger-v1.3-unsigned.apk
+            Android-signing-tools-v1.3.zip
           if-no-files-found: error
           retention-days: 30
