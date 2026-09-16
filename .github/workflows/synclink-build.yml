@@ -1,0 +1,53 @@
+name: Build SyncLink Android APK
+
+on:
+  push:
+    branches:
+      - synclink-apk-build
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Build debug APK
+        working-directory: synclink
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Prepare APK
+        run: |
+          cp synclink/app/build/outputs/apk/debug/app-debug.apk SyncLink-v0.1.apk
+          sha256sum SyncLink-v0.1.apk > SyncLink-v0.1.sha256
+
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SyncLink-v0.1-Android
+          path: |
+            SyncLink-v0.1.apk
+            SyncLink-v0.1.sha256
+          retention-days: 30
