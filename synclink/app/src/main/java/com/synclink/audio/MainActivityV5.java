@@ -178,6 +178,16 @@ public class MainActivityV5 extends Activity {
         extraLabel = text("Extra output: auto-detecting…",13,TEXT,true); route.addView(extraLabel);
         route.addView(gap(8));
         Button extra = outline("CHOOSE EXTRA OUTPUT"); extra.setOnClickListener(v->chooseExtraOutput()); route.addView(extra,new LinearLayout.LayoutParams(-1,dp(46)));
+        route.addView(gap(10));
+        Button phoneProbe = button("TEST PHONE + CURRENT BLUETOOTH", PURPLE);
+        phoneProbe.setOnClickListener(v->testPhonePlusBluetooth());
+        route.addView(phoneProbe,new LinearLayout.LayoutParams(-1,dp(50)));
+        TextView phoneProbeHint = text("This checks whether Samsung will truly let SyncLink keep media on the current Bluetooth output while a second SyncLink track plays from this phone. SyncLink verifies the real routed devices instead of trusting the request.",12,MUTED,false);
+        phoneProbeHint.setPadding(0,dp(8),0,0); route.addView(phoneProbeHint);
+        route.addView(gap(8));
+        Button separateSound = outline("SAMSUNG SEPARATE APP SOUND FALLBACK");
+        separateSound.setOnClickListener(v->openSeparateAppSoundHelp());
+        route.addView(separateSound,new LinearLayout.LayoutParams(-1,dp(46)));
         root.addView(route);
 
         root.addView(gap(24));
@@ -209,14 +219,14 @@ public class MainActivityV5 extends Activity {
         Button stop = outline("STOP PANDORA MIRROR"); stop.setOnClickListener(v->stopPandoraMirror()); music.addView(stop,new LinearLayout.LayoutParams(-1,dp(44)));
         root.addView(music);
 
-        root.addView(gap(22)); TextView ver = text("SyncLink v0.5.0 • adaptive sync prototype",12,DIM,false); ver.setGravity(Gravity.CENTER); root.addView(ver);
+        root.addView(gap(22)); TextView ver = text("SyncLink v0.5.1 • verified routing + calibration",12,DIM,false); ver.setGravity(Gravity.CENTER); root.addView(ver);
         return scroll;
     }
 
     private void addDelayControl(LinearLayout parent, String title, String key, int defaultMs) {
         TextView name = text(title,12,TEXT,true); parent.addView(name);
         LinearLayout r = row();
-        SeekBar bar = new SeekBar(this); bar.setMax(400); int value = prefs.getInt(key,defaultMs); bar.setProgress(value);
+        SeekBar bar = new SeekBar(this); bar.setMax(1500); int value = Math.min(1500, prefs.getInt(key,defaultMs)); bar.setProgress(value);
         TextView valueText = text(value+" ms",12,CYAN,true); valueText.setGravity(Gravity.END);
         r.addView(bar,new LinearLayout.LayoutParams(0,dp(42),1f)); r.addView(valueText,new LinearLayout.LayoutParams(dp(70),-2)); parent.addView(r);
         if ("delay_system".equals(key)) { systemDelay=bar; systemDelayValue=valueText; }
@@ -265,41 +275,230 @@ public class MainActivityV5 extends Activity {
     private void beginAutoCalibration(){
         if(calibrating)return;
         if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},REQ_RECORD);return;}
-        AudioDeviceInfo extra=chosenExtra();AudioDeviceInfo phone=phoneSpeaker();if(phone==null){toast("Phone speaker is not exposed to SyncLink.");return;}
-        calibrating=true;calibrationStatus.setText("Calibrating… keep the room reasonably quiet. You will hear one chirp from each logical route.");
+        AudioDeviceInfo extra=chosenExtra(); AudioDeviceInfo phone=phoneSpeaker();
+        if(phone==null){toast("Phone speaker is not exposed to SyncLink.");return;}
+        calibrating=true;
+        calibrationStatus.setText("Calibrating 3 passes per route… SyncLink will verify the REAL output first, then correlate the chirp captured by the microphone. Keep the phone still.");
         new Thread(()->{
-            double sys=measureLatency(null,"Samsung group");
-            double ph=measureLatency(phone,"Phone");
-            double ex=extra==null?-1:measureLatency(extra,"Extra");
+            CalResult sys=measureRoute(null,"Samsung group",AudioAttributes.USAGE_MEDIA,false);
+            int phoneUsage=prefs.getInt("phone_route_usage",AudioAttributes.USAGE_MEDIA);
+            CalResult ph=measureRoute(phone,"Phone",phoneUsage,true);
+            CalResult ex=extra==null?CalResult.missing("Extra"):measureRoute(extra,"Extra",AudioAttributes.USAGE_MEDIA,false);
             runOnUiThread(()->{calibrating=false;applyCalibration(sys,ph,ex);});
         },"SyncLink-Calibrate").start();
     }
 
-    private double measureLatency(AudioDeviceInfo preferred,String label){
-        final int rate=48000, chunk=480;int min=AudioRecord.getMinBufferSize(rate,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT);if(min<=0)min=rate;
-        AudioRecord rec=null;AudioTrack track=null;
-        try{
-            rec=new AudioRecord.Builder().setAudioSource(MediaRecorder.AudioSource.UNPROCESSED).setAudioFormat(new AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(rate).setChannelMask(AudioFormat.CHANNEL_IN_MONO).build()).setBufferSizeInBytes(Math.max(min*4,rate*2)).build();
-            AudioDeviceInfo mic=builtInMic();if(mic!=null)rec.setPreferredDevice(mic);
-            short[] tone=makeChirp(rate,140);track=new AudioTrack.Builder().setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build()).setAudioFormat(new AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(rate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build()).setBufferSizeInBytes(tone.length*2).setTransferMode(AudioTrack.MODE_STATIC).build();if(preferred!=null)track.setPreferredDevice(preferred);track.write(tone,0,tone.length);
-            AtomicBoolean done=new AtomicBoolean(false);AtomicLong detectedNs=new AtomicLong(0);AtomicLong baselineCount=new AtomicLong(0);final double[] baselineSum={0};final long[] playNs={0};AudioRecord finalRec=rec;
-            rec.startRecording();
-            Thread reader=new Thread(()->{short[] buf=new short[chunk];long start=System.nanoTime();while(!done.get()&&System.nanoTime()-start<1_800_000_000L){int n=finalRec.read(buf,0,buf.length,AudioRecord.READ_BLOCKING);if(n<=0)continue;double sum=0;for(int i=0;i<n;i++){double v=buf[i];sum+=v*v;}double rms=Math.sqrt(sum/Math.max(1,n));long now=System.nanoTime();if(playNs[0]==0){baselineSum[0]+=rms;baselineCount.incrementAndGet();}else{double base=baselineCount.get()==0?100:baselineSum[0]/baselineCount.get();double threshold=Math.max(700,base*4.5);if(rms>threshold&&detectedNs.compareAndSet(0,now)){done.set(true);break;}}}},"SyncLink-Mic");reader.start();
-            Thread.sleep(320);playNs[0]=System.nanoTime();track.play();reader.join(1600);done.set(true);double ms=detectedNs.get()==0?-1:(detectedNs.get()-playNs[0])/1_000_000.0;return ms;
-        }catch(Throwable t){return -1;}finally{try{if(rec!=null){rec.stop();rec.release();}}catch(Exception ignored){}try{if(track!=null){track.stop();track.release();}}catch(Exception ignored){}}
+    private CalResult measureRoute(AudioDeviceInfo preferred,String label,int usage,boolean expectPhone){
+        ArrayList<Double> valid=new ArrayList<>(); String actual="unknown"; boolean routeOk=true;
+        for(int trial=0;trial<3;trial++){
+            CalResult r=measureLatencyOnce(preferred,label,usage,expectPhone);
+            if(r.actualRoute!=null&&!r.actualRoute.isEmpty())actual=r.actualRoute;
+            if(!r.routeOk)routeOk=false;
+            if(r.latencyMs>=0&&r.routeOk)valid.add(r.latencyMs);
+            try{Thread.sleep(180);}catch(InterruptedException ignored){}
+        }
+        if(!routeOk)return new CalResult(label,-1,actual,false,0);
+        if(valid.isEmpty())return new CalResult(label,-1,actual,true,0);
+        Collections.sort(valid);
+        double median=valid.get(valid.size()/2);
+        double spread=valid.size()<2?0:valid.get(valid.size()-1)-valid.get(0);
+        return new CalResult(label,median,actual,true,spread);
     }
 
-    private short[] makeChirp(int rate,int ms){int frames=rate*ms/1000;short[] out=new short[frames];for(int i=0;i<frames;i++){double t=(double)i/rate;double f=1200+1800.0*i/Math.max(1,frames-1);double env=Math.sin(Math.PI*i/Math.max(1,frames-1));out[i]=(short)(Math.sin(2*Math.PI*f*t)*env*26000);}return out;}
-    private void applyCalibration(double sys,double phone,double extra){
-        ArrayList<Double> vals=new ArrayList<>();if(sys>=0)vals.add(sys);if(phone>=0)vals.add(phone);if(extra>=0)vals.add(extra);if(vals.isEmpty()){calibrationStatus.setText("Calibration could not hear the chirps. Turn the speakers up and try again, or tune the delay sliders manually.");return;}double max=0;for(double v:vals)if(v>max)max=v;int ds=sys<0?prefs.getInt("delay_system",0):(int)Math.max(0,Math.round(max-sys));int dp=phone<0?prefs.getInt("delay_phone",180):(int)Math.max(0,Math.round(max-phone));int de=extra<0?prefs.getInt("delay_extra",0):(int)Math.max(0,Math.round(max-extra));ds=Math.min(ds,400);dp=Math.min(dp,400);de=Math.min(de,400);prefs.edit().putInt("delay_system",ds).putInt("delay_phone",dp).putInt("delay_extra",de).putFloat("lat_system",(float)sys).putFloat("lat_phone",(float)phone).putFloat("lat_extra",(float)extra).apply();setDelayUi(systemDelay,systemDelayValue,ds);setDelayUi(phoneDelay,phoneDelayValue,dp);setDelayUi(extraDelay,extraDelayValue,de);calibrationStatus.setText(String.format(Locale.US,"Measured arrival: Samsung %.0f ms • Phone %.0f ms • Extra %s. Compensation saved.",sys,phone,extra<0?"n/a":String.format(Locale.US,"%.0f ms",extra)));}
-    private void setDelayUi(SeekBar bar,TextView value,int ms){if(bar!=null)bar.setProgress(ms);if(value!=null)value.setText(ms+" ms");}
+    private CalResult measureLatencyOnce(AudioDeviceInfo preferred,String label,int usage,boolean expectPhone){
+        final int rate=48000;
+        AudioRecord rec=null; AudioTrack track=null;
+        try{
+            int min=AudioRecord.getMinBufferSize(rate,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT);
+            if(min<=0)min=rate;
+            rec=new AudioRecord.Builder()
+                    .setAudioSource(MediaRecorder.AudioSource.UNPROCESSED)
+                    .setAudioFormat(new AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(rate).setChannelMask(AudioFormat.CHANNEL_IN_MONO).build())
+                    .setBufferSizeInBytes(Math.max(min*6,rate*3))
+                    .build();
+            AudioDeviceInfo mic=builtInMic(); if(mic!=null)rec.setPreferredDevice(mic);
+            short[] chirp=makeCalibrationChirp(rate,90);
+            track=new AudioTrack.Builder()
+                    .setAudioAttributes(new AudioAttributes.Builder().setUsage(usage).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+                    .setAudioFormat(new AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(rate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
+                    .setBufferSizeInBytes(chirp.length*2)
+                    .setTransferMode(AudioTrack.MODE_STATIC).build();
+            if(preferred!=null)track.setPreferredDevice(preferred);
+            track.setVolume(0.55f);
+            track.write(chirp,0,chirp.length);
+
+            int pre=rate/5; // 200 ms of microphone baseline before playback
+            int post=rate;  // search up to 1 second after playback
+            short[] capture=new short[pre+post];
+            rec.startRecording();
+            int got=readFully(rec,capture,0,pre);
+            if(got<pre/2)return new CalResult(label,-1,"mic read failed",false,0);
+            track.play();
+            try{Thread.sleep(80);}catch(InterruptedException ignored){}
+            AudioDeviceInfo routed=null; try{routed=track.getRoutedDevice();}catch(Throwable ignored){}
+            String actual=routed==null?"no route reported":deviceName(routed);
+            boolean routeOk=!expectPhone || (routed!=null&&routed.getType()==AudioDeviceInfo.TYPE_BUILTIN_SPEAKER);
+            int remain=capture.length-pre; readFully(rec,capture,pre,remain);
+            if(!routeOk)return new CalResult(label,-1,actual,false,0);
+            double latency=correlateChirpMs(capture,pre,chirp,rate);
+            return new CalResult(label,latency,actual,true,0);
+        }catch(Throwable t){
+            return new CalResult(label,-1,t.getClass().getSimpleName(),false,0);
+        }finally{
+            try{if(rec!=null){rec.stop();rec.release();}}catch(Exception ignored){}
+            try{if(track!=null){track.stop();track.release();}}catch(Exception ignored){}
+        }
+    }
+
+    private int readFully(AudioRecord rec,short[] dst,int off,int len){
+        int done=0;
+        while(done<len){
+            int n=rec.read(dst,off+done,len-done,AudioRecord.READ_BLOCKING);
+            if(n<=0)break;
+            done+=n;
+        }
+        return done;
+    }
+
+    private short[] makeCalibrationChirp(int rate,int ms){
+        int frames=rate*ms/1000; short[] out=new short[frames];
+        double phase=0;
+        for(int i=0;i<frames;i++){
+            double x=(double)i/Math.max(1,frames-1);
+            double f=900+4100*x;
+            phase+=2*Math.PI*f/rate;
+            double env=Math.sin(Math.PI*x);
+            out[i]=(short)(Math.sin(phase)*env*25000);
+        }
+        return out;
+    }
+
+    private double correlateChirpMs(short[] capture,int expectedStart,short[] chirp,int rate){
+        int step=6;
+        int start=Math.max(0,expectedStart-rate/50); // allow ~20 ms scheduling jitter
+        int end=Math.min(capture.length-chirp.length, expectedStart+rate*9/10);
+        if(end<=start)return -1;
+        double best=-1; int bestAt=-1;
+        for(int pos=start;pos<=end;pos+=step){
+            double dot=0,aa=0,bb=0;
+            for(int j=0;j<chirp.length;j+=step){
+                double a=capture[pos+j], b=chirp[j];
+                dot+=a*b; aa+=a*a; bb+=b*b;
+            }
+            double score=(aa>0&&bb>0)?Math.abs(dot)/Math.sqrt(aa*bb):0;
+            if(score>best){best=score;bestAt=pos;}
+        }
+        if(bestAt<0||best<0.10)return -1;
+        return (bestAt-expectedStart)*1000.0/rate;
+    }
+
+    private void applyCalibration(CalResult sys,CalResult phone,CalResult extra){
+        if(!phone.routeOk){
+            calibrationStatus.setText("Calibration stopped: the track requested for THIS PHONE was actually routed to "+phone.actualRoute+". A delay slider cannot fix a routing failure. Run ‘TEST PHONE + CURRENT BLUETOOTH’ first.");
+            return;
+        }
+        ArrayList<Double> vals=new ArrayList<>();
+        if(sys.latencyMs>=0)vals.add(sys.latencyMs);
+        if(phone.latencyMs>=0)vals.add(phone.latencyMs);
+        if(extra.latencyMs>=0)vals.add(extra.latencyMs);
+        if(vals.isEmpty()){calibrationStatus.setText("Calibration could not lock onto the chirps. Turn the test volume up, keep the phone still, and retry.");return;}
+        double max=0;for(double v:vals)if(v>max)max=v;
+        int ds=sys.latencyMs<0?prefs.getInt("delay_system",0):(int)Math.max(0,Math.round(max-sys.latencyMs));
+        int dp=phone.latencyMs<0?prefs.getInt("delay_phone",180):(int)Math.max(0,Math.round(max-phone.latencyMs));
+        int de=extra.latencyMs<0?prefs.getInt("delay_extra",0):(int)Math.max(0,Math.round(max-extra.latencyMs));
+        ds=Math.min(ds,1500);dp=Math.min(dp,1500);de=Math.min(de,1500);
+        prefs.edit().putInt("delay_system",ds).putInt("delay_phone",dp).putInt("delay_extra",de)
+                .putFloat("lat_system",(float)sys.latencyMs).putFloat("lat_phone",(float)phone.latencyMs).putFloat("lat_extra",(float)extra.latencyMs).apply();
+        setDelayUi(systemDelay,systemDelayValue,ds);setDelayUi(phoneDelay,phoneDelayValue,dp);setDelayUi(extraDelay,extraDelayValue,de);
+        String extraText=extra.latencyMs<0?"n/a":String.format(Locale.US,"%.0f ms",extra.latencyMs);
+        calibrationStatus.setText(String.format(Locale.US,
+                "Verified routes + median of 3 passes: Samsung %.0f ms (%s) • Phone %.0f ms (%s) • Extra %s. Compensation: Samsung %d ms • Phone %d ms • Extra %d ms.",
+                sys.latencyMs,sys.actualRoute,phone.latencyMs,phone.actualRoute,extraText,ds,dp,de));
+    }
+
+    private void setDelayUi(SeekBar bar,TextView value,int ms){if(bar!=null)bar.setProgress(Math.min(1500,ms));if(value!=null)value.setText(ms+" ms");}
+
+    private void testPhonePlusBluetooth(){
+        AudioDeviceInfo phone=phoneSpeaker();
+        if(phone==null){toast("Android is not exposing the built-in speaker.");return;}
+        new Thread(()->{
+            int[] usages=new int[]{AudioAttributes.USAGE_MEDIA,AudioAttributes.USAGE_ASSISTANCE_SONIFICATION,AudioAttributes.USAGE_ALARM};
+            String[] names=new String[]{"Media","Sonification","Alarm"};
+            StringBuilder report=new StringBuilder();
+            int successUsage=-1; String successSystem="",successPhone="";
+            for(int i=0;i<usages.length;i++){
+                ArrayList<AudioTrack> ts=new ArrayList<>();
+                try{
+                    short[] p=makePulsePattern(48000,0,950);
+                    AudioTrack system=buildProbeTrack(null,AudioAttributes.USAGE_MEDIA,p,0.38f);
+                    AudioTrack local=buildProbeTrack(phone,usages[i],p,0.38f);
+                    ts.add(system);ts.add(local);
+                    system.play();local.play();
+                    try{Thread.sleep(220);}catch(InterruptedException ignored){}
+                    AudioDeviceInfo sr=null,pr=null;try{sr=system.getRoutedDevice();pr=local.getRoutedDevice();}catch(Throwable ignored){}
+                    String sName=sr==null?"no route":deviceName(sr);
+                    String pName=pr==null?"no route":deviceName(pr);
+                    boolean systemExternal=sr!=null&&sr.getType()!=AudioDeviceInfo.TYPE_BUILTIN_SPEAKER;
+                    boolean phoneLocal=pr!=null&&pr.getType()==AudioDeviceInfo.TYPE_BUILTIN_SPEAKER;
+                    report.append(names[i]).append(": Bluetooth/system → ").append(sName).append(" | phone track → ").append(pName).append("\n");
+                    if(systemExternal&&phoneLocal){successUsage=usages[i];successSystem=sName;successPhone=pName;break;}
+                    try{Thread.sleep(850);}catch(InterruptedException ignored){}
+                }catch(Throwable t){report.append(names[i]).append(": ").append(t.getClass().getSimpleName()).append("\n");}
+                finally{for(AudioTrack t:ts)try{t.stop();t.release();}catch(Exception ignored){}}
+            }
+            final int saved=successUsage;final String rep=report.toString();final String ss=successSystem,sp=successPhone;
+            runOnUiThread(()->{
+                if(saved!=-1){
+                    prefs.edit().putInt("phone_route_usage",saved).apply();
+                    new AlertDialog.Builder(this).setTitle("Phone + Bluetooth route verified")
+                            .setMessage("YES — Android kept the default media route on "+ss+" while SyncLink independently routed its second track to "+sp+".\n\nSyncLink saved the working phone-routing strategy. Auto Calibration and the synchronized test will use it now.\n\nDiagnostics:\n"+rep)
+                            .setPositiveButton("Auto calibrate",(d,w)->beginAutoCalibration()).setNegativeButton("Close",null).show();
+                }else{
+                    new AlertDialog.Builder(this).setTitle("Android blocked the direct phone route")
+                            .setMessage("SyncLink tried three public routing strategies and verified the actual devices. None kept Bluetooth media active while also routing a SyncLink track to the built-in speaker.\n\nThat is why pushing the phone delay to 400 ms did nothing useful — it was a ROUTING problem, not a latency problem.\n\nSamsung’s Separate app sound can still give us a supported fallback for Pandora: keep Pandora on the PartyBox and route SyncLink’s captured mirror to This phone.\n\nDiagnostics:\n"+rep)
+                            .setNegativeButton("Close",null).setPositiveButton("Open sound settings",(d,w)->openSeparateAppSoundHelp()).show();
+                }
+            });
+        },"SyncLink-PhoneRouteProbe").start();
+    }
+
+    private AudioTrack buildProbeTrack(AudioDeviceInfo preferred,int usage,short[] pcm,float volume){
+        AudioTrack t=new AudioTrack.Builder()
+                .setAudioAttributes(new AudioAttributes.Builder().setUsage(usage).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+                .setAudioFormat(new AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(48000).setChannelMask(AudioFormat.CHANNEL_OUT_STEREO).build())
+                .setBufferSizeInBytes(pcm.length*2).setTransferMode(AudioTrack.MODE_STATIC).build();
+        if(preferred!=null)t.setPreferredDevice(preferred);t.setVolume(volume);t.write(pcm,0,pcm.length);return t;
+    }
+
+    private void openSeparateAppSoundHelp(){
+        new AlertDialog.Builder(this).setTitle("Samsung Separate app sound fallback")
+                .setMessage("Set Separate app sound so SyncLink plays on THIS PHONE while your main media output stays on the PartyBox.\n\nSettings → Sounds and vibration → Separate app sound → Turn on → App: SyncLink → Audio device: Phone.\n\nThen start Pandora on the PartyBox and use SyncLink’s Pandora mirror. This is the clean Samsung-supported way to keep the source app on Bluetooth while SyncLink plays the copied stream from the phone speaker.")
+                .setNegativeButton("Cancel",null).setPositiveButton("Open Sounds & vibration",(d,w)->{try{startActivity(new Intent(Settings.ACTION_SOUND_SETTINGS));}catch(Exception e){startActivity(new Intent(Settings.ACTION_SETTINGS));}}).show();
+    }
+
+    private static class CalResult{
+        final String label;final double latencyMs;final String actualRoute;final boolean routeOk;final double spreadMs;
+        CalResult(String l,double ms,String actual,boolean ok,double spread){label=l;latencyMs=ms;actualRoute=actual==null?"unknown":actual;routeOk=ok;spreadMs=spread;}
+        static CalResult missing(String l){return new CalResult(l,-1,"not selected",true,0);}
+    }
 
     private void runSynchronizedTest(){
-        int ds=prefs.getInt("delay_system",0),dp=prefs.getInt("delay_phone",180),de=prefs.getInt("delay_extra",0);AudioDeviceInfo phone=phoneSpeaker(),extra=chosenExtra();ArrayList<AudioTrack> tracks=new ArrayList<>();try{
-            tracks.add(buildStaticTestTrack(null,ds));if(phone!=null)tracks.add(buildStaticTestTrack(phone,dp));if(extra!=null)tracks.add(buildStaticTestTrack(extra,de));for(AudioTrack t:tracks)t.play();toast("Listen for one tight click pattern. Adjust delays if you still hear 1-2-3.");new Handler(getMainLooper()).postDelayed(()->{for(AudioTrack t:tracks)try{t.stop();t.release();}catch(Exception ignored){}},4200);
+        int ds=prefs.getInt("delay_system",0),dp=prefs.getInt("delay_phone",180),de=prefs.getInt("delay_extra",0);
+        int phoneUsage=prefs.getInt("phone_route_usage",AudioAttributes.USAGE_MEDIA);
+        AudioDeviceInfo phone=phoneSpeaker(),extra=chosenExtra();ArrayList<AudioTrack> tracks=new ArrayList<>();try{
+            tracks.add(buildStaticTestTrack(null,ds,AudioAttributes.USAGE_MEDIA));
+            if(phone!=null)tracks.add(buildStaticTestTrack(phone,dp,phoneUsage));
+            if(extra!=null)tracks.add(buildStaticTestTrack(extra,de,AudioAttributes.USAGE_MEDIA));
+            for(AudioTrack t:tracks)t.play();
+            new Handler(getMainLooper()).postDelayed(()->{
+                ArrayList<String> routes=new ArrayList<>();for(AudioTrack t:tracks)try{AudioDeviceInfo d=t.getRoutedDevice();routes.add(d==null?"unknown":deviceName(d));}catch(Throwable ignored){}
+                toast("Actual test routes: "+String.join(" + ",routes));
+            },260);
+            toast("Listen for one tight click pattern. Auto calibration now verifies routes before calculating delay.");
+            new Handler(getMainLooper()).postDelayed(()->{for(AudioTrack t:tracks)try{t.stop();t.release();}catch(Exception ignored){}},5200);
         }catch(Throwable t){for(AudioTrack x:tracks)try{x.release();}catch(Exception ignored){}toast("Sync test failed: "+t.getClass().getSimpleName());}
     }
-    private AudioTrack buildStaticTestTrack(AudioDeviceInfo preferred,int delayMs){int rate=48000;short[] pcm=makePulsePattern(rate,delayMs,3200);AudioTrack t=new AudioTrack.Builder().setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build()).setAudioFormat(new AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(rate).setChannelMask(AudioFormat.CHANNEL_OUT_STEREO).build()).setBufferSizeInBytes(pcm.length*2).setTransferMode(AudioTrack.MODE_STATIC).build();if(preferred!=null)t.setPreferredDevice(preferred);t.write(pcm,0,pcm.length);return t;}
+    private AudioTrack buildStaticTestTrack(AudioDeviceInfo preferred,int delayMs,int usage){int rate=48000;short[] pcm=makePulsePattern(rate,delayMs,3200);AudioTrack t=new AudioTrack.Builder().setAudioAttributes(new AudioAttributes.Builder().setUsage(usage).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build()).setAudioFormat(new AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(rate).setChannelMask(AudioFormat.CHANNEL_OUT_STEREO).build()).setBufferSizeInBytes(pcm.length*2).setTransferMode(AudioTrack.MODE_STATIC).build();if(preferred!=null)t.setPreferredDevice(preferred);t.setVolume(0.55f);t.write(pcm,0,pcm.length);return t;}
     private short[] makePulsePattern(int rate,int delayMs,int totalMs){int frames=rate*(totalMs+delayMs)/1000;short[] out=new short[frames*2];int delayFrames=rate*delayMs/1000;for(int i=delayFrames;i<frames;i++){double t=(double)(i-delayFrames)/rate;double cycle=t%0.55;double env=cycle<0.075?Math.sin(Math.PI*cycle/0.075):0;short v=(short)(Math.sin(2*Math.PI*850*t)*env*23000);out[i*2]=v;out[i*2+1]=v;}return out;}
 
     private void beginPandoraMirror(){
@@ -314,7 +513,7 @@ public class MainActivityV5 extends Activity {
     private void openSamsungMedia(){try{Intent i=new Intent("com.android.systemui.action.LAUNCH_SYSTEM_MEDIA_OUTPUT_DIALOG");i.setPackage("com.android.systemui");List<ResolveInfo> r=getPackageManager().queryBroadcastReceivers(i,0);if(r!=null&&!r.isEmpty()){sendBroadcast(i);return;}}catch(Throwable ignored){}if(Build.VERSION.SDK_INT>=34)try{if(MediaRouter2.getInstance(this).showSystemOutputSwitcher())return;}catch(Throwable ignored){}try{Intent panel=new Intent("com.android.settings.panel.action.MEDIA_OUTPUT");startActivity(panel);return;}catch(Exception ignored){}new AlertDialog.Builder(this).setTitle("Samsung Media output").setMessage("Swipe down from the top-right, tap Media output, and select the two JBL speakers.").setPositiveButton("OK",null).show();}
     private void openPandora(){try{Intent i=getPackageManager().getLaunchIntentForPackage("com.pandora.android");if(i!=null){startActivity(i);return;}startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("market://details?id=com.pandora.android")));}catch(Exception e){toast("Pandora isn't installed.");}}
 
-    private void showTutorial(){new AlertDialog.Builder(this).setTitle("SyncLink v0.5").setMessage("The new plan uses three logical routes instead of pretending every Bluetooth connection is independently routable:\n\n1. Samsung Dual Audio = your two JBL speakers.\n2. Phone speaker = independent SyncLink route.\n3. Extra output = an exposed device such as the Sony.\n\nAuto Calibrate listens for each route with the phone microphone and adds delay to the faster paths.\n\nFor Pandora, start the music on the JBL pair first. The safe mirror tests whether Pandora is capturable before it creates any phone/Sony playback track, so a failed capture should no longer steal your music route.").setNegativeButton("Close",null).setPositiveButton("Got it",(d,w)->prefs.edit().putBoolean("tutorial_050",true).apply()).show();}
+    private void showTutorial(){new AlertDialog.Builder(this).setTitle("SyncLink v0.5.1").setMessage("We found the important distinction: CONNECTED does not mean Android will route two copies of the same audio where we ask.\n\n1. Samsung Dual Audio still handles two Bluetooth speakers.\n2. ‘Test Phone + Current Bluetooth’ now verifies whether SyncLink can independently route a second track to the built-in phone speaker.\n3. Auto Calibration only measures a route AFTER Android confirms the track really reached that route, and it uses three chirp passes with correlation instead of a single volume spike.\n4. If Samsung blocks the direct phone route, use Separate app sound: Pandora stays on Bluetooth while SyncLink’s captured mirror is assigned to This phone.\n\nThe delay controls now go to 1500 ms, but SyncLink will no longer pretend a delay can repair a routing failure.").setNegativeButton("Close",null).setPositiveButton("Got it",(d,w)->prefs.edit().putBoolean("tutorial_050",true).apply()).show();}
 
     @SuppressWarnings("deprecation")private BluetoothDevice deviceFrom(Intent i){if(i==null)return null;if(Build.VERSION.SDK_INT>=33)return i.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE,BluetoothDevice.class);return i.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);}
     private String norm(String s){return s==null?"":s.toLowerCase(Locale.US).replace("nick's","").replace("nick’s","").replaceAll("[^a-z0-9]","");}
