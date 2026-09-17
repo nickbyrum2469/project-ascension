@@ -23,7 +23,7 @@
         android:theme="@android:style/Theme.Material.NoActionBar">
 
         <activity
-            android:name=".MainActivityV2"
+            android:name=".MainActivityV3"
             android:exported="true"
             android:screenOrientation="portrait">
             <intent-filter>
