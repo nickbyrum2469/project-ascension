@@ -5,6 +5,7 @@ on:
     branches:
       - synclink-v0.2
       - synclink-v0.3
+      - synclink-v0.4
   workflow_dispatch:
 
 permissions:
@@ -59,16 +60,16 @@ jobs:
       - name: Prepare and verify APK
         shell: bash
         run: |
-          cp synclink/app/build/outputs/apk/debug/app-debug.apk SyncLink-v0.3.0.apk
-          /usr/local/lib/android/sdk/build-tools/35.0.0/apksigner verify --verbose --print-certs SyncLink-v0.3.0.apk
-          /usr/local/lib/android/sdk/build-tools/35.0.0/aapt dump badging SyncLink-v0.3.0.apk | head -n 12
-          sha256sum SyncLink-v0.3.0.apk > SyncLink-v0.3.0.sha256
+          cp synclink/app/build/outputs/apk/debug/app-debug.apk SyncLink-v0.4.0.apk
+          /usr/local/lib/android/sdk/build-tools/35.0.0/apksigner verify --verbose --print-certs SyncLink-v0.4.0.apk
+          /usr/local/lib/android/sdk/build-tools/35.0.0/aapt dump badging SyncLink-v0.4.0.apk | head -n 12
+          sha256sum SyncLink-v0.4.0.apk > SyncLink-v0.4.0.sha256
 
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: SyncLink-v0.3.0-Android
+          name: SyncLink-v0.4.0-Android
           path: |
-            SyncLink-v0.3.0.apk
-            SyncLink-v0.3.0.sha256
+            SyncLink-v0.4.0.apk
+            SyncLink-v0.4.0.sha256
           retention-days: 30
