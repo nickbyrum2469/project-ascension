@@ -33,6 +33,31 @@ jobs:
           yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null || true
           /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
 
+      - name: Restore SyncLink signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.synclink-signing
+          key: synclink-signing-v1
+
+      - name: Ensure persistent signing key
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.synclink-signing"
+          KEYSTORE="$HOME/.synclink-signing/synclink.jks"
+          if [ ! -f "$KEYSTORE" ]; then
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE" \
+              -storepass synclink-dev \
+              -keypass synclink-dev \
+              -alias synclink \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 36500 \
+              -dname "CN=SyncLink Development, OU=SyncLink, O=SyncLink, L=Pagosa Springs, ST=Colorado, C=US" \
+              -noprompt
+          fi
+          echo "SYNCLINK_KEYSTORE=$KEYSTORE" >> "$GITHUB_ENV"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -45,16 +70,16 @@ jobs:
       - name: Prepare and verify APK
         shell: bash
         run: |
-          cp synclink/app/build/outputs/apk/debug/app-debug.apk SyncLink-v0.2.apk
-          /usr/local/lib/android/sdk/build-tools/35.0.0/apksigner verify --verbose SyncLink-v0.2.apk
-          /usr/local/lib/android/sdk/build-tools/35.0.0/aapt dump badging SyncLink-v0.2.apk | head -n 12
-          sha256sum SyncLink-v0.2.apk > SyncLink-v0.2.sha256
+          cp synclink/app/build/outputs/apk/debug/app-debug.apk SyncLink-v0.2.1.apk
+          /usr/local/lib/android/sdk/build-tools/35.0.0/apksigner verify --verbose --print-certs SyncLink-v0.2.1.apk
+          /usr/local/lib/android/sdk/build-tools/35.0.0/aapt dump badging SyncLink-v0.2.1.apk | head -n 12
+          sha256sum SyncLink-v0.2.1.apk > SyncLink-v0.2.1.sha256
 
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: SyncLink-v0.2-Android
+          name: SyncLink-v0.2.1-Android
           path: |
-            SyncLink-v0.2.apk
-            SyncLink-v0.2.sha256
+            SyncLink-v0.2.1.apk
+            SyncLink-v0.2.1.sha256
           retention-days: 30
