@@ -27,7 +27,7 @@
         android:theme="@android:style/Theme.Material.NoActionBar">
 
         <activity
-            android:name=".MainActivityV4"
+            android:name=".MainActivityV5"
             android:exported="true"
             android:screenOrientation="portrait">
             <intent-filter>
@@ -37,7 +37,7 @@
         </activity>
 
         <service
-            android:name=".PandoraMirrorService"
+            android:name=".PandoraMirrorServiceV5"
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
     </application>
