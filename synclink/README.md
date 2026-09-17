@@ -1,12 +1,14 @@
-# SyncLink v0.1
+# SyncLink
 
-Android prototype for mapping mixed-generation speaker setups and building honest Direct / Auracast / Relay routing plans.
+Android prototype for mapping mixed-generation speaker setups and testing simultaneous output routing.
 
-Initial target setup:
+Current test hardware:
 - Sony HT-CT370 — legacy Bluetooth A2DP
 - JBL Flip 6 — PartyBoost generation
-- New-generation JBL PartyBox — exact model detected at runtime
+- JBL PartyBox Club 120 — Auracast-capable current generation
 
-v0.1 includes runtime Bluetooth permissions, paired/nearby discovery, A2DP and LE Audio profile detection, active Android output diagnostics, per-speaker saved delay offsets (-500 ms to +500 ms), party-plan calculation, and a sync test tone through the actual active media route.
+v0.3 adds a verified multi-output routing lab. SyncLink can generate synchronized PCM, request specific Android output devices per AudioTrack, and then inspect the actual routed device reported by Android so we can distinguish a successful route from a preferred-device request that the OS ignored.
 
-Android does not expose arbitrary simultaneous A2DP routing to normal third-party apps, so SyncLink does not pretend the Flip 6 and HT-CT370 can already be driven simultaneously from one phone. The cross-brand design uses timestamped Wi-Fi Relay nodes for legacy speakers while Auracast/system routing handles compatible hardware. Wi-Fi audio relay is the next engine layer after this hardware-mapping prototype.
+The production architecture remains hybrid: Samsung Dual Audio/Auracast where the OS supports it, plus relay/bridge paths for legacy speakers that cannot be driven simultaneously through the phone's normal media route.
+
+Build note: update-compatible test APKs are rebuilt from the original signing-key branch so they can install over v0.2.2 without removing the app.
