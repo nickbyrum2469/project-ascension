@@ -3,6 +3,7 @@ name: Build SyncLink Android APK
 on:
   push:
     branches:
+      - synclink-v0.2
       - synclink-v0.3
   workflow_dispatch:
 
@@ -39,23 +40,11 @@ jobs:
           path: ~/.synclink-signing
           key: synclink-signing-v1
 
-      - name: Ensure persistent signing key
+      - name: Require existing signing key
         shell: bash
         run: |
-          mkdir -p "$HOME/.synclink-signing"
           KEYSTORE="$HOME/.synclink-signing/synclink.jks"
-          if [ ! -f "$KEYSTORE" ]; then
-            keytool -genkeypair -v \
-              -keystore "$KEYSTORE" \
-              -storepass synclink-dev \
-              -keypass synclink-dev \
-              -alias synclink \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 36500 \
-              -dname "CN=SyncLink Development, OU=SyncLink, O=SyncLink, L=Pagosa Springs, ST=Colorado, C=US" \
-              -noprompt
-          fi
+          test -f "$KEYSTORE"
           echo "SYNCLINK_KEYSTORE=$KEYSTORE" >> "$GITHUB_ENV"
 
       - name: Set up Gradle
