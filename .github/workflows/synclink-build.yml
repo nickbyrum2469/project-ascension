@@ -47,6 +47,13 @@ jobs:
           test -f "$KEYSTORE"
           echo "SYNCLINK_KEYSTORE=$KEYSTORE" >> "$GITHUB_ENV"
 
+      - name: Stamp v0.4 Android version
+        shell: bash
+        run: |
+          sed -i "s/versionCode 5/versionCode 6/" synclink/app/build.gradle
+          sed -i "s/versionName '0.3.0'/versionName '0.4.0'/" synclink/app/build.gradle
+          grep -E "versionCode|versionName" synclink/app/build.gradle
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
