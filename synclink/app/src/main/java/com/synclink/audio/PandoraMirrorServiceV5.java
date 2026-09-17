@@ -181,8 +181,9 @@ public class PandoraMirrorServiceV5 extends Service {
         int phoneMirrorDelay = Math.max(0, phoneComp - systemComp);
         int extraMirrorDelay = Math.max(0, extraComp - systemComp);
 
-        if (phone != null) sinks.add(new MirrorSink("phone", phone, phoneMirrorDelay, rate));
-        if (extra != null) sinks.add(new MirrorSink(deviceName(extra), extra, extraMirrorDelay, rate));
+        int phoneUsage = prefs.getInt("phone_route_usage", AudioAttributes.USAGE_MEDIA);
+        if (phone != null) sinks.add(new MirrorSink("phone", phone, phoneMirrorDelay, rate, phoneUsage, true));
+        if (extra != null) sinks.add(new MirrorSink(deviceName(extra), extra, extraMirrorDelay, rate, AudioAttributes.USAGE_MEDIA, false));
         for (MirrorSink sink : sinks) sink.start();
         return !sinks.isEmpty();
     }
@@ -218,16 +219,20 @@ public class PandoraMirrorServiceV5 extends Service {
         final AudioDeviceInfo device;
         final int delayMs;
         final int rate;
+        final int usage;
+        final boolean expectBuiltInSpeaker;
         final ArrayBlockingQueue<short[]> queue = new ArrayBlockingQueue<>(10);
         volatile boolean open;
         AudioTrack track;
         Thread writer;
 
-        MirrorSink(String name, AudioDeviceInfo device, int delayMs, int rate) {
+        MirrorSink(String name, AudioDeviceInfo device, int delayMs, int rate, int usage, boolean expectBuiltInSpeaker) {
             this.name = name;
             this.device = device;
-            this.delayMs = Math.min(500, Math.max(0, delayMs));
+            this.delayMs = Math.min(1500, Math.max(0, delayMs));
             this.rate = rate;
+            this.usage = usage;
+            this.expectBuiltInSpeaker = expectBuiltInSpeaker;
         }
 
         void start() {
@@ -235,7 +240,7 @@ public class PandoraMirrorServiceV5 extends Service {
             int bufferBytes = Math.max(bytesPerSecond * 2, 262144);
             track = new AudioTrack.Builder()
                     .setAudioAttributes(new AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setUsage(usage)
                             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                             .build())
                     .setAudioFormat(new AudioFormat.Builder()
@@ -252,6 +257,13 @@ public class PandoraMirrorServiceV5 extends Service {
             int silenceFrames = rate * (baseMs + delayMs) / 1000;
             if (silenceFrames > 0) track.write(new short[silenceFrames * 2], 0, silenceFrames * 2, AudioTrack.WRITE_BLOCKING);
             track.play();
+            try {
+                Thread.sleep(120);
+                AudioDeviceInfo actual = track.getRoutedDevice();
+                if (expectBuiltInSpeaker && (actual == null || actual.getType() != AudioDeviceInfo.TYPE_BUILTIN_SPEAKER)) {
+                    status("Pandora was captured, but the phone mirror track routed to " + (actual == null ? "an unknown output" : deviceName(actual)) + " instead of This phone. Enable Samsung Separate app sound for SyncLink → Phone, then retry.");
+                }
+            } catch (Throwable ignored) {}
             open = true;
             writer = new Thread(() -> {
                 try {
