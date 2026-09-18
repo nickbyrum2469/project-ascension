@@ -123,14 +123,15 @@ public class PandoraMirrorServiceV5 extends Service {
             int baseMs=18, silenceFrames=rate*(baseMs+delayMs)/1000;
             if(silenceFrames>0)track.write(new short[silenceFrames*2],0,silenceFrames*2,AudioTrack.WRITE_BLOCKING);
             track.play();
-            AudioDeviceInfo actual=waitForRoute(1500);
-            boolean routeOk=expectBuiltInSpeaker ? actual!=null&&actual.getType()==AudioDeviceInfo.TYPE_BUILTIN_SPEAKER : actual!=null&&(actual.getId()==device.getId()||matches(deviceName(device),deviceName(actual)));
-            if(!routeOk){String actualName=actual==null?"no routed device after 1.5 seconds":deviceName(actual);status("Android did not verify the requested " + name + " route; actual route: " + actualName + ". SyncLink rejected that sink.");safeReleaseTrack();return false;}
+            AudioDeviceInfo actual=waitForRequestedRoute(1500);
+            boolean routeOk=isRequestedRoute(actual);
+            if(!routeOk){String actualName=actual==null?"no routed device after 1.5 seconds":deviceName(actual);status("Android did not verify the requested " + name + " route; final observed route: " + actualName + ". SyncLink rejected that sink.");safeReleaseTrack();return false;}
             open=true;
             writer=new Thread(()->{try{while(open&&running){short[] chunk=queue.poll(500,TimeUnit.MILLISECONDS);if(chunk==null)continue;int off=0;while(off<chunk.length&&open&&running){int wrote=track.write(chunk,off,chunk.length-off,AudioTrack.WRITE_BLOCKING);if(wrote<=0)break;off+=wrote;}}}catch(Throwable ignored){ }},"SyncLink-Sink-"+name.replace(' ','_'));
             writer.start(); return true;
         }
-        private AudioDeviceInfo waitForRoute(long timeoutMs){long end=System.nanoTime()+timeoutMs*1_000_000L;AudioDeviceInfo actual=null;while(running&&System.nanoTime()<end){try{actual=track.getRoutedDevice();if(actual!=null)return actual;Thread.sleep(50);}catch(Throwable ignored){break;}}return actual;}
+        private boolean isRequestedRoute(AudioDeviceInfo actual){return expectBuiltInSpeaker ? actual!=null&&actual.getType()==AudioDeviceInfo.TYPE_BUILTIN_SPEAKER : actual!=null&&(actual.getId()==device.getId()||matches(deviceName(device),deviceName(actual)));}
+        private AudioDeviceInfo waitForRequestedRoute(long timeoutMs){long end=System.nanoTime()+timeoutMs*1_000_000L;AudioDeviceInfo last=null;while(running&&System.nanoTime()<end){try{AudioDeviceInfo actual=track.getRoutedDevice();if(actual!=null){last=actual;if(isRequestedRoute(actual))return actual;}Thread.sleep(50);}catch(Throwable ignored){break;}}return last;}
         private void safeReleaseTrack(){try{if(track!=null){try{track.pause();}catch(Exception ignored){}try{track.flush();}catch(Exception ignored){}track.release();}}catch(Exception ignored){}track=null;}
         void enqueue(short[] source,int n){if(!open||n<=0)return;short[] copy=new short[n];System.arraycopy(source,0,copy,0,n);if(!queue.offer(copy)){queue.poll();queue.offer(copy);}}
         void close(){open=false;queue.clear();if(writer!=null)writer.interrupt();writer=null;safeReleaseTrack();}
