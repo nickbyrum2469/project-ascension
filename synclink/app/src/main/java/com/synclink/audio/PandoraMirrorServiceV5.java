@@ -15,11 +15,14 @@ import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioPlaybackCaptureConfiguration;
 import android.media.AudioRecord;
+import android.media.AudioRouting;
 import android.media.AudioTrack;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 
 import java.util.ArrayList;
 import java.util.Locale;
@@ -35,6 +38,7 @@ public class PandoraMirrorServiceV5 extends Service {
     private volatile boolean running;
     private Thread captureThread;
     private MediaProjection projection;
+    private MediaProjection.Callback projectionCallback;
     private AudioRecord record;
     private final ArrayList<MirrorSink> sinks = new ArrayList<>();
     private SharedPreferences prefs;
@@ -63,17 +67,21 @@ public class PandoraMirrorServiceV5 extends Service {
             MediaProjectionManager mpm = getSystemService(MediaProjectionManager.class);
             projection = mpm == null ? null : mpm.getMediaProjection(resultCode, data);
             if (projection == null) throw new IllegalStateException("No MediaProjection token");
+            projectionCallback = new MediaProjection.Callback() { @Override public void onStop() { status("Android ended playback capture. SyncLink stopped all mirror outputs cleanly."); stopMirror(); stopSelf(); } };
+            projection.registerCallback(projectionCallback, new Handler(Looper.getMainLooper()));
             ApplicationInfo pandora = getPackageManager().getApplicationInfo("com.pandora.android", 0);
             AudioPlaybackCaptureConfiguration config = new AudioPlaybackCaptureConfiguration.Builder(projection).addMatchingUid(pandora.uid).addMatchingUsage(AudioAttributes.USAGE_MEDIA).addMatchingUsage(AudioAttributes.USAGE_UNKNOWN).addMatchingUsage(AudioAttributes.USAGE_GAME).build();
             int rate = 48000, channel = AudioFormat.CHANNEL_IN_STEREO;
             int min = AudioRecord.getMinBufferSize(rate, channel, AudioFormat.ENCODING_PCM_16BIT);
             int buf = Math.max(min * 6, 65536);
             record = new AudioRecord.Builder().setAudioPlaybackCaptureConfig(config).setAudioFormat(new AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(rate).setChannelMask(channel).build()).setBufferSizeInBytes(buf).build();
+            if (record.getState() != AudioRecord.STATE_INITIALIZED) throw new IllegalStateException("Playback-capture recorder did not initialize");
             running = true; record.startRecording();
+            if (record.getRecordingState() != AudioRecord.RECORDSTATE_RECORDING) throw new IllegalStateException("Playback capture did not enter recording state");
             status("Listening for real Pandora PCM… your outputs have not been changed yet.");
             captureThread = new Thread(() -> captureLoop(rate), "SyncLink-V5-Capture"); captureThread.start();
         } catch (PackageManager.NameNotFoundException e) { status("Pandora is not installed."); stopSelf(); }
-        catch (Throwable t) { status("Pandora capture could not start: " + t.getClass().getSimpleName()); stopSelf(); }
+        catch (Throwable t) { status("Pandora capture could not start: " + t.getClass().getSimpleName()); stopMirror(); stopSelf(); }
     }
 
     private void captureLoop(int rate) {
@@ -105,13 +113,13 @@ public class PandoraMirrorServiceV5 extends Service {
     }
 
     private boolean isBluetoothOutput(AudioDeviceInfo d) { int t=d.getType(); return t==AudioDeviceInfo.TYPE_BLUETOOTH_A2DP||t==AudioDeviceInfo.TYPE_BLUETOOTH_SCO||t==AudioDeviceInfo.TYPE_BLE_HEADSET||t==AudioDeviceInfo.TYPE_BLE_SPEAKER||t==AudioDeviceInfo.TYPE_HEARING_AID; }
-    private String sinkNames() { ArrayList<String> names=new ArrayList<>(); for(MirrorSink s:sinks) names.add(s.name); return String.join(" + ",names); }
+    private String sinkNames() { ArrayList<String> names=new ArrayList<>(); synchronized(sinks){for(MirrorSink s:sinks) if(s.open) names.add(s.name);} return String.join(" + ",names); }
     private double rms(short[] pcm,int n){double sum=0;int step=Math.max(1,n/1024),c=0;for(int i=0;i<n;i+=step){double v=pcm[i];sum+=v*v;c++;}return Math.sqrt(sum/Math.max(1,c));}
     private int peak(short[] pcm,int n){int p=0,step=Math.max(1,n/1024);for(int i=0;i<n;i+=step)p=Math.max(p,Math.abs((int)pcm[i]));return p;}
 
     private class MirrorSink {
         final String name; final AudioDeviceInfo device; final int delayMs,rate,usage; final boolean expectBuiltInSpeaker;
-        final ArrayBlockingQueue<short[]> queue=new ArrayBlockingQueue<>(10); volatile boolean open; AudioTrack track; Thread writer;
+        final ArrayBlockingQueue<short[]> queue=new ArrayBlockingQueue<>(10); volatile boolean open; AudioTrack track; Thread writer; AudioRouting.OnRoutingChangedListener routingListener;
         MirrorSink(String name,AudioDeviceInfo device,int delayMs,int rate,int usage,boolean expectBuiltInSpeaker){this.name=name;this.device=device;this.delayMs=Math.min(1500,Math.max(0,delayMs));this.rate=rate;this.usage=usage;this.expectBuiltInSpeaker=expectBuiltInSpeaker;}
         boolean start(){
             int bytesPerSecond=rate*2*2, bufferBytes=Math.max(bytesPerSecond*2,262144);
@@ -127,12 +135,24 @@ public class PandoraMirrorServiceV5 extends Service {
             boolean routeOk=isRequestedRoute(actual);
             if(!routeOk){String actualName=actual==null?"no routed device after 1.5 seconds":deviceName(actual);status("Android did not verify the requested " + name + " route; final observed route: " + actualName + ". SyncLink rejected that sink.");safeReleaseTrack();return false;}
             open=true;
+            routingListener = router -> {
+                if(!open || track==null) return;
+                AudioDeviceInfo now;
+                try { now=track.getRoutedDevice(); } catch(Throwable t) { return; }
+                if(now!=null && !isRequestedRoute(now)) {
+                    String moved=deviceName(now);
+                    status(name + " was verified, but Android later moved that mirror to " + moved + ". SyncLink shut down the invalid sink instead of letting it drift or duplicate another speaker.");
+                    close();
+                    synchronized(sinks){sinks.remove(this);}
+                }
+            };
+            track.addOnRoutingChangedListener(routingListener, new Handler(Looper.getMainLooper()));
             writer=new Thread(()->{try{while(open&&running){short[] chunk=queue.poll(500,TimeUnit.MILLISECONDS);if(chunk==null)continue;int off=0;while(off<chunk.length&&open&&running){int wrote=track.write(chunk,off,chunk.length-off,AudioTrack.WRITE_BLOCKING);if(wrote<=0)break;off+=wrote;}}}catch(Throwable ignored){ }},"SyncLink-Sink-"+name.replace(' ','_'));
             writer.start(); return true;
         }
         private boolean isRequestedRoute(AudioDeviceInfo actual){return expectBuiltInSpeaker ? actual!=null&&actual.getType()==AudioDeviceInfo.TYPE_BUILTIN_SPEAKER : actual!=null&&(actual.getId()==device.getId()||matches(deviceName(device),deviceName(actual)));}
         private AudioDeviceInfo waitForRequestedRoute(long timeoutMs){long end=System.nanoTime()+timeoutMs*1_000_000L;AudioDeviceInfo last=null;while(running&&System.nanoTime()<end){try{AudioDeviceInfo actual=track.getRoutedDevice();if(actual!=null){last=actual;if(isRequestedRoute(actual))return actual;}Thread.sleep(50);}catch(Throwable ignored){break;}}return last;}
-        private void safeReleaseTrack(){try{if(track!=null){try{track.pause();}catch(Exception ignored){}try{track.flush();}catch(Exception ignored){}track.release();}}catch(Exception ignored){}track=null;}
+        private void safeReleaseTrack(){try{if(track!=null){if(routingListener!=null)try{track.removeOnRoutingChangedListener(routingListener);}catch(Exception ignored){}routingListener=null;try{track.pause();}catch(Exception ignored){}try{track.flush();}catch(Exception ignored){}track.release();}}catch(Exception ignored){}track=null;}
         void enqueue(short[] source,int n){if(!open||n<=0)return;short[] copy=new short[n];System.arraycopy(source,0,copy,0,n);if(!queue.offer(copy)){queue.poll();queue.offer(copy);}}
         void close(){open=false;queue.clear();if(writer!=null)writer.interrupt();writer=null;safeReleaseTrack();}
     }
@@ -142,7 +162,7 @@ public class PandoraMirrorServiceV5 extends Service {
     private String norm(String s){return s==null?"":s.toLowerCase(Locale.US).replace("nick's","").replace("nick’s","").replaceAll("[^a-z0-9]","");}
     private Notification notification(String text){if(Build.VERSION.SDK_INT>=26)return new Notification.Builder(this,CH).setSmallIcon(android.R.drawable.ic_media_play).setContentTitle("SyncLink Pandora Mirror").setContentText(text).setOngoing(true).build();return new Notification.Builder(this).setSmallIcon(android.R.drawable.ic_media_play).setContentTitle("SyncLink Pandora Mirror").setContentText(text).setOngoing(true).build();}
     private void status(String text){NotificationManager nm=getSystemService(NotificationManager.class);if(nm!=null)nm.notify(ID,notification(text));sendBroadcast(new Intent(ACTION_STATUS).setPackage(getPackageName()).putExtra("text",text));}
-    private synchronized void stopMirror(){running=false;if(captureThread!=null&&captureThread!=Thread.currentThread())captureThread.interrupt();captureThread=null;for(MirrorSink sink:new ArrayList<>(sinks))sink.close();sinks.clear();try{if(record!=null){record.stop();record.release();}}catch(Exception ignored){}record=null;try{if(projection!=null)projection.stop();}catch(Exception ignored){}projection=null;}
+    private synchronized void stopMirror(){running=false;if(captureThread!=null&&captureThread!=Thread.currentThread())captureThread.interrupt();captureThread=null;for(MirrorSink sink:new ArrayList<>(sinks))sink.close();sinks.clear();try{if(record!=null){record.stop();record.release();}}catch(Exception ignored){}record=null;try{if(projection!=null&&projectionCallback!=null)projection.unregisterCallback(projectionCallback);}catch(Exception ignored){}projectionCallback=null;try{if(projection!=null)projection.stop();}catch(Exception ignored){}projection=null;}
     @Override public void onDestroy(){stopMirror();super.onDestroy();}
     @Override public IBinder onBind(Intent intent){return null;}
 }
