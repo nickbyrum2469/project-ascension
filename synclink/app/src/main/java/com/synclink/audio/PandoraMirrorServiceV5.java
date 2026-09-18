@@ -134,7 +134,7 @@ public class PandoraMirrorServiceV5 extends Service {
 
             if (!running) return;
             if (goodChunks < 3) {
-                status("Pandora returned digital silence. SyncLink did NOT create phone/Sony outputs, so your existing Bluetooth route should stay untouched.");
+                status("Pandora returned digital silence or blocked playback capture. SyncLink did NOT create phone/Sony outputs, so your existing Bluetooth route was left untouched.");
                 stopSelf();
                 return;
             }
@@ -151,7 +151,7 @@ public class PandoraMirrorServiceV5 extends Service {
                 if (n <= 0) break;
             }
 
-            status("Pandora captured ✓  Mirroring live audio to " + sinkNames() + ".");
+            status("Pandora captured ✓  Verified live mirror routes: " + sinkNames() + ".");
             while (running) {
                 int n = record.read(pcm, 0, pcm.length, AudioRecord.READ_BLOCKING);
                 if (n <= 0) continue;
@@ -182,9 +182,12 @@ public class PandoraMirrorServiceV5 extends Service {
         int extraMirrorDelay = Math.max(0, extraComp - systemComp);
 
         int phoneUsage = prefs.getInt("phone_route_usage", AudioAttributes.USAGE_MEDIA);
-        if (phone != null) sinks.add(new MirrorSink("phone", phone, phoneMirrorDelay, rate, phoneUsage, true));
-        if (extra != null) sinks.add(new MirrorSink(deviceName(extra), extra, extraMirrorDelay, rate, AudioAttributes.USAGE_MEDIA, false));
-        for (MirrorSink sink : sinks) sink.start();
+        ArrayList<MirrorSink> requested = new ArrayList<>();
+        if (phone != null) requested.add(new MirrorSink("phone", phone, phoneMirrorDelay, rate, phoneUsage, true));
+        if (extra != null) requested.add(new MirrorSink(deviceName(extra), extra, extraMirrorDelay, rate, AudioAttributes.USAGE_MEDIA, false));
+        for (MirrorSink sink : requested) {
+            if (sink.start()) sinks.add(sink);
+        }
         return !sinks.isEmpty();
     }
 
@@ -235,7 +238,7 @@ public class PandoraMirrorServiceV5 extends Service {
             this.expectBuiltInSpeaker = expectBuiltInSpeaker;
         }
 
-        void start() {
+        boolean start() {
             int bytesPerSecond = rate * 2 * 2;
             int bufferBytes = Math.max(bytesPerSecond * 2, 262144);
             track = new AudioTrack.Builder()
@@ -258,12 +261,27 @@ public class PandoraMirrorServiceV5 extends Service {
             if (silenceFrames > 0) track.write(new short[silenceFrames * 2], 0, silenceFrames * 2, AudioTrack.WRITE_BLOCKING);
             track.play();
             try {
-                Thread.sleep(120);
+                Thread.sleep(220);
                 AudioDeviceInfo actual = track.getRoutedDevice();
-                if (expectBuiltInSpeaker && (actual == null || actual.getType() != AudioDeviceInfo.TYPE_BUILTIN_SPEAKER)) {
-                    status("Pandora was captured, but the phone mirror track routed to " + (actual == null ? "an unknown output" : deviceName(actual)) + " instead of This phone. Enable Samsung Separate app sound for SyncLink → Phone, then retry.");
+                boolean routeOk;
+                if (expectBuiltInSpeaker) {
+                    routeOk = actual != null && actual.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER;
+                } else {
+                    routeOk = actual != null && (actual.getId() == device.getId() || matches(deviceName(device), deviceName(actual)));
                 }
-            } catch (Throwable ignored) {}
+                if (!routeOk) {
+                    String actualName = actual == null ? "an unknown output" : deviceName(actual);
+                    status("Captured audio is available, but Android rerouted the requested " + name + " mirror to " + actualName + ". SyncLink rejected that sink instead of pretending it worked.");
+                    try { track.pause(); track.flush(); track.release(); } catch (Exception ignored) {}
+                    track = null;
+                    return false;
+                }
+            } catch (Throwable t) {
+                try { if (track != null) { track.pause(); track.flush(); track.release(); } } catch (Exception ignored) {}
+                track = null;
+                status("Could not verify the requested " + name + " route: " + t.getClass().getSimpleName());
+                return false;
+            }
             open = true;
             writer = new Thread(() -> {
                 try {
@@ -281,6 +299,7 @@ public class PandoraMirrorServiceV5 extends Service {
                 }
             }, "SyncLink-Sink-" + name.replace(' ', '_'));
             writer.start();
+            return true;
         }
 
         void enqueue(short[] source, int n) {
