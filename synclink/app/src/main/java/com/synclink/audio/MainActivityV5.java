@@ -61,6 +61,9 @@ public class MainActivityV5 extends Activity {
     private static final int REQ_BT = 9500;
     private static final int REQ_RECORD = 9501;
     private static final int REQ_CAPTURE = 9502;
+    private static final int PENDING_NONE = 0;
+    private static final int PENDING_CALIBRATION = 1;
+    private static final int PENDING_MIRROR = 2;
     private static final int BG = Color.rgb(8,11,22), PANEL = Color.rgb(17,22,39), PANEL2 = Color.rgb(24,30,52);
     private static final int TEXT = Color.rgb(244,246,255), MUTED = Color.rgb(155,165,192), PURPLE = Color.rgb(124,92,255);
     private static final int GREEN = Color.rgb(74,222,128), ORANGE = Color.rgb(255,145,77), AMBER = Color.rgb(251,191,36), CYAN = Color.rgb(65,210,245), DIM = Color.rgb(82,91,118);
@@ -76,6 +79,7 @@ public class MainActivityV5 extends Activity {
     private SeekBar systemDelay, phoneDelay, extraDelay;
     private TextView systemDelayValue, phoneDelayValue, extraDelayValue;
     private volatile boolean calibrating;
+    private int pendingRecordAction = PENDING_NONE;
 
     private final BluetoothProfile.ServiceListener profileListener = new BluetoothProfile.ServiceListener() {
         @Override public void onServiceConnected(int profile, BluetoothProfile proxy) {
@@ -126,7 +130,7 @@ public class MainActivityV5 extends Activity {
         requestBluetooth();
         registerProfiles();
         refresh();
-        if (!prefs.getBoolean("tutorial_051", false)) new Handler(getMainLooper()).postDelayed(this::showTutorial, 450);
+        if (!prefs.getBoolean("tutorial_060", false)) new Handler(getMainLooper()).postDelayed(this::showTutorial, 450);
     }
 
     @Override protected void onResume() { super.onResume(); refresh(); }
@@ -161,7 +165,7 @@ public class MainActivityV5 extends Activity {
 
         LinearLayout statusCard = card(Color.rgb(13,25,45),18,16);
         connectionStatus = text("Checking connected speakers…",14,GREEN,true); statusCard.addView(connectionStatus);
-        TextView statusHint = text("Samsung Dual Audio is treated as one system group; SyncLink can add the phone and one independently exposed output around it.",12,MUTED,false); statusHint.setPadding(0,dp(6),0,0); statusCard.addView(statusHint);
+        TextView statusHint = text("CONNECTED only means the Bluetooth link is alive. SyncLink v0.6 verifies the actual playback route before it trusts any phone, Sony, or Samsung-group output.",12,MUTED,false); statusHint.setPadding(0,dp(6),0,0); statusCard.addView(statusHint);
         root.addView(statusCard); root.addView(gap(24));
 
         root.addView(step("1","Connect everything","Keep the JBLs and Sony connected. Paired-only devices stay dimmed."));
@@ -170,7 +174,7 @@ public class MainActivityV5 extends Activity {
         deviceList = col(); root.addView(deviceList);
 
         root.addView(gap(24));
-        root.addView(step("2","Build the route","Put the two JBLs on Samsung Dual Audio. Then choose one extra exposed output—normally your Sony."));
+        root.addView(step("2","Build a verified route","Put two Bluetooth leaders on Samsung Dual Audio, then probe any extra exposed route instead of assuming Android honored it."));
         root.addView(gap(10));
         LinearLayout route = card(PANEL,18,16);
         Button dual = button("OPEN SAMSUNG MEDIA OUTPUT",PANEL2); dual.setOnClickListener(v->openSamsungMedia()); route.addView(dual,new LinearLayout.LayoutParams(-1,dp(48)));
@@ -178,6 +182,8 @@ public class MainActivityV5 extends Activity {
         extraLabel = text("Extra output: auto-detecting…",13,TEXT,true); route.addView(extraLabel);
         route.addView(gap(8));
         Button extra = outline("CHOOSE EXTRA OUTPUT"); extra.setOnClickListener(v->chooseExtraOutput()); route.addView(extra,new LinearLayout.LayoutParams(-1,dp(46)));
+        route.addView(gap(9));
+        Button diag = outline("RUN ROUTE DIAGNOSTICS"); diag.setOnClickListener(v->runRouteDiagnostics()); route.addView(diag,new LinearLayout.LayoutParams(-1,dp(46)));
         route.addView(gap(10));
         Button phoneProbe = button("TEST PHONE + CURRENT BLUETOOTH", PURPLE);
         phoneProbe.setOnClickListener(v->testPhonePlusBluetooth());
@@ -219,7 +225,7 @@ public class MainActivityV5 extends Activity {
         Button stop = outline("STOP PANDORA MIRROR"); stop.setOnClickListener(v->stopPandoraMirror()); music.addView(stop,new LinearLayout.LayoutParams(-1,dp(44)));
         root.addView(music);
 
-        root.addView(gap(22)); TextView ver = text("SyncLink v0.5.1 • verified routing + calibration",12,DIM,false); ver.setGravity(Gravity.CENTER); root.addView(ver);
+        root.addView(gap(22)); TextView ver = text("SyncLink v0.6.0 • verified routing + safer capture + diagnostics",12,DIM,false); ver.setGravity(Gravity.CENTER); root.addView(ver);
         return scroll;
     }
 
@@ -249,7 +255,22 @@ public class MainActivityV5 extends Activity {
     }
     private void registerProfiles(){if(bt!=null&&allowed())try{bt.getProfileProxy(this,profileListener,BluetoothProfile.A2DP);bt.getProfileProxy(this,profileListener,BluetoothProfile.HEADSET);if(Build.VERSION.SDK_INT>=31)bt.getProfileProxy(this,profileListener,BluetoothProfile.LE_AUDIO);}catch(Exception ignored){}}
     private void requestBluetooth(){ArrayList<String> m=new ArrayList<>();if(Build.VERSION.SDK_INT>=31){if(checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED)m.add(Manifest.permission.BLUETOOTH_CONNECT);if(checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN)!=PackageManager.PERMISSION_GRANTED)m.add(Manifest.permission.BLUETOOTH_SCAN);}else if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)m.add(Manifest.permission.ACCESS_FINE_LOCATION);if(!m.isEmpty())requestPermissions(m.toArray(new String[0]),REQ_BT);}
-    @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] grantResults){super.onRequestPermissionsResult(requestCode,permissions,grantResults);if(requestCode==REQ_BT){registerProfiles();refresh();}if(requestCode==REQ_RECORD&&grantResults.length>0&&grantResults[0]==PackageManager.PERMISSION_GRANTED)beginAutoCalibration();}
+    @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] grantResults){
+        super.onRequestPermissionsResult(requestCode,permissions,grantResults);
+        if(requestCode==REQ_BT){registerProfiles();refresh();return;}
+        if(requestCode==REQ_RECORD){
+            boolean granted=grantResults.length>0&&grantResults[0]==PackageManager.PERMISSION_GRANTED;
+            int pending=pendingRecordAction;
+            pendingRecordAction=PENDING_NONE;
+            if(!granted){
+                if(pending==PENDING_MIRROR&&pandoraStatus!=null)pandoraStatus.setText("Audio capture permission was denied. Nothing was rerouted.");
+                if(pending==PENDING_CALIBRATION&&calibrationStatus!=null)calibrationStatus.setText("Microphone permission is required for acoustic calibration.");
+                return;
+            }
+            if(pending==PENDING_MIRROR)beginPandoraMirror();
+            else if(pending==PENDING_CALIBRATION)beginAutoCalibration();
+        }
+    }
     private boolean allowed(){return Build.VERSION.SDK_INT<31||checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)==PackageManager.PERMISSION_GRANTED;}
 
     private void refresh(){
@@ -272,9 +293,40 @@ public class MainActivityV5 extends Activity {
     private AudioDeviceInfo phoneSpeaker(){for(AudioDeviceInfo d:getOutputDevices())if(d.getType()==AudioDeviceInfo.TYPE_BUILTIN_SPEAKER)return d;return null;}
     private AudioDeviceInfo builtInMic(){if(audio==null)return null;for(AudioDeviceInfo d:audio.getDevices(AudioManager.GET_DEVICES_INPUTS))if(d.getType()==AudioDeviceInfo.TYPE_BUILTIN_MIC)return d;return null;}
 
+    private void runRouteDiagnostics(){
+        StringBuilder out=new StringBuilder();
+        out.append("Android output devices exposed to SyncLink:\n");
+        for(AudioDeviceInfo d:getOutputDevices()){
+            out.append("• ").append(deviceName(d)).append("  [").append(typeName(d.getType())).append(", id=").append(d.getId()).append("]\n");
+        }
+        out.append("\nBluetooth profile connections:\n");
+        int profileCount=0;
+        if(a2dp!=null&&allowed())try{
+            for(BluetoothDevice d:a2dp.getConnectedDevices()){out.append("• A2DP: ").append(shortName(d.getName())).append("\n");profileCount++;}
+        }catch(SecurityException ignored){}
+        if(Build.VERSION.SDK_INT>=31&&leAudio!=null&&allowed())try{
+            for(BluetoothDevice d:leAudio.getConnectedDevices()){out.append("• LE Audio: ").append(shortName(d.getName())).append("\n");profileCount++;}
+        }catch(SecurityException ignored){}
+        if(profileCount==0)out.append("• No active media-profile devices reported.\n");
+        out.append("\nImportant: a device may be Bluetooth-CONNECTED but absent from the audio-device list. Android will not let a normal app target that device independently until the system exposes it as an output.");
+        new AlertDialog.Builder(this).setTitle("SyncLink route diagnostics").setMessage(out.toString()).setPositiveButton("Close",null).show();
+    }
+
+    private String typeName(int type){
+        if(type==AudioDeviceInfo.TYPE_BUILTIN_SPEAKER)return "PHONE SPEAKER";
+        if(type==AudioDeviceInfo.TYPE_BLUETOOTH_A2DP)return "BLUETOOTH A2DP";
+        if(type==AudioDeviceInfo.TYPE_BLUETOOTH_SCO)return "BLUETOOTH SCO";
+        if(type==AudioDeviceInfo.TYPE_BLE_SPEAKER)return "BLE SPEAKER";
+        if(type==AudioDeviceInfo.TYPE_BLE_HEADSET)return "BLE HEADSET";
+        if(type==AudioDeviceInfo.TYPE_HEARING_AID)return "HEARING AID";
+        if(type==AudioDeviceInfo.TYPE_USB_DEVICE)return "USB";
+        if(type==AudioDeviceInfo.TYPE_WIRED_HEADPHONES||type==AudioDeviceInfo.TYPE_WIRED_HEADSET)return "WIRED";
+        return "TYPE "+type;
+    }
+
     private void beginAutoCalibration(){
         if(calibrating)return;
-        if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},REQ_RECORD);return;}
+        if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){pendingRecordAction=PENDING_CALIBRATION;requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},REQ_RECORD);return;}
         AudioDeviceInfo extra=chosenExtra(); AudioDeviceInfo phone=phoneSpeaker();
         if(phone==null){toast("Phone speaker is not exposed to SyncLink.");return;}
         calibrating=true;
@@ -311,11 +363,8 @@ public class MainActivityV5 extends Activity {
         try{
             int min=AudioRecord.getMinBufferSize(rate,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT);
             if(min<=0)min=rate;
-            rec=new AudioRecord.Builder()
-                    .setAudioSource(MediaRecorder.AudioSource.UNPROCESSED)
-                    .setAudioFormat(new AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(rate).setChannelMask(AudioFormat.CHANNEL_IN_MONO).build())
-                    .setBufferSizeInBytes(Math.max(min*6,rate*3))
-                    .build();
+            rec=buildCalibrationRecorder(rate,min);
+            if(rec==null)return new CalResult(label,-1,"no usable microphone recorder",false,0);
             AudioDeviceInfo mic=builtInMic(); if(mic!=null)rec.setPreferredDevice(mic);
             short[] chirp=makeCalibrationChirp(rate,90);
             track=new AudioTrack.Builder()
@@ -334,7 +383,7 @@ public class MainActivityV5 extends Activity {
             int got=readFully(rec,capture,0,pre);
             if(got<pre/2)return new CalResult(label,-1,"mic read failed",false,0);
             track.play();
-            try{Thread.sleep(80);}catch(InterruptedException ignored){}
+            try{Thread.sleep(180);}catch(InterruptedException ignored){}
             AudioDeviceInfo routed=null; try{routed=track.getRoutedDevice();}catch(Throwable ignored){}
             String actual=routed==null?"no route reported":deviceName(routed);
             boolean routeOk=!expectPhone || (routed!=null&&routed.getType()==AudioDeviceInfo.TYPE_BUILTIN_SPEAKER);
@@ -348,6 +397,23 @@ public class MainActivityV5 extends Activity {
             try{if(rec!=null){rec.stop();rec.release();}}catch(Exception ignored){}
             try{if(track!=null){track.stop();track.release();}}catch(Exception ignored){}
         }
+    }
+
+    private AudioRecord buildCalibrationRecorder(int rate,int min){
+        int[] sources=new int[]{MediaRecorder.AudioSource.UNPROCESSED,MediaRecorder.AudioSource.VOICE_RECOGNITION,MediaRecorder.AudioSource.MIC};
+        for(int source:sources){
+            AudioRecord candidate=null;
+            try{
+                candidate=new AudioRecord.Builder()
+                        .setAudioSource(source)
+                        .setAudioFormat(new AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(rate).setChannelMask(AudioFormat.CHANNEL_IN_MONO).build())
+                        .setBufferSizeInBytes(Math.max(min*6,rate*3))
+                        .build();
+                if(candidate.getState()==AudioRecord.STATE_INITIALIZED)return candidate;
+            }catch(Throwable ignored){}
+            try{if(candidate!=null)candidate.release();}catch(Exception ignored){}
+        }
+        return null;
     }
 
     private int readFully(AudioRecord rec,short[] dst,int off,int len){
@@ -491,9 +557,16 @@ public class MainActivityV5 extends Activity {
             if(extra!=null)tracks.add(buildStaticTestTrack(extra,de,AudioAttributes.USAGE_MEDIA));
             for(AudioTrack t:tracks)t.play();
             new Handler(getMainLooper()).postDelayed(()->{
-                ArrayList<String> routes=new ArrayList<>();for(AudioTrack t:tracks)try{AudioDeviceInfo d=t.getRoutedDevice();routes.add(d==null?"unknown":deviceName(d));}catch(Throwable ignored){}
-                toast("Actual test routes: "+String.join(" + ",routes));
-            },260);
+                ArrayList<String> routes=new ArrayList<>();
+                HashSet<Integer> uniqueIds=new HashSet<>();
+                for(AudioTrack t:tracks)try{
+                    AudioDeviceInfo d=t.getRoutedDevice();
+                    if(d==null)routes.add("unknown");
+                    else{routes.add(deviceName(d)+" ["+typeName(d.getType())+"]");uniqueIds.add(d.getId());}
+                }catch(Throwable ignored){}
+                String verdict=uniqueIds.size()>=tracks.size()?"Independent routes verified.":"Android collapsed one or more requested tracks onto the same physical route.";
+                new AlertDialog.Builder(this).setTitle("Synchronized route test").setMessage(verdict+"\n\nActual routes:\n• "+String.join("\n• ",routes)).setPositiveButton("Close",null).show();
+            },420);
             toast("Listen for one tight click pattern. Auto calibration now verifies routes before calculating delay.");
             new Handler(getMainLooper()).postDelayed(()->{for(AudioTrack t:tracks)try{t.stop();t.release();}catch(Exception ignored){}},5200);
         }catch(Throwable t){for(AudioTrack x:tracks)try{x.release();}catch(Exception ignored){}toast("Sync test failed: "+t.getClass().getSimpleName());}
@@ -503,7 +576,7 @@ public class MainActivityV5 extends Activity {
 
     private void beginPandoraMirror(){
         if(Build.VERSION.SDK_INT<29){toast("Playback capture requires Android 10 or newer.");return;}
-        if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},REQ_RECORD);pandoraStatus.setText("Microphone/audio-capture permission is required. After granting it, tap the Pandora mirror button again.");return;}
+        if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){pendingRecordAction=PENDING_MIRROR;requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},REQ_RECORD);pandoraStatus.setText("Audio-capture permission is required. SyncLink will continue the mirror setup automatically after you grant it.");return;}
         new AlertDialog.Builder(this).setTitle("Safe Pandora mirror").setMessage("First make sure Pandora is already playing through the two JBLs in Samsung Media output. Android will show a screen-capture permission dialog because that is the only public API that can request playback audio. SyncLink will test Pandora silently first. If Pandora blocks capture, SyncLink stops without creating the phone/Sony tracks.").setNegativeButton("Cancel",null).setPositiveButton("Continue",(d,w)->requestProjection()).show();
     }
     private void requestProjection(){MediaProjectionManager mpm=getSystemService(MediaProjectionManager.class);if(mpm==null){toast("MediaProjection is unavailable.");return;}startActivityForResult(mpm.createScreenCaptureIntent(),REQ_CAPTURE);}
@@ -513,7 +586,7 @@ public class MainActivityV5 extends Activity {
     private void openSamsungMedia(){try{Intent i=new Intent("com.android.systemui.action.LAUNCH_SYSTEM_MEDIA_OUTPUT_DIALOG");i.setPackage("com.android.systemui");List<ResolveInfo> r=getPackageManager().queryBroadcastReceivers(i,0);if(r!=null&&!r.isEmpty()){sendBroadcast(i);return;}}catch(Throwable ignored){}if(Build.VERSION.SDK_INT>=34)try{if(MediaRouter2.getInstance(this).showSystemOutputSwitcher())return;}catch(Throwable ignored){}try{Intent panel=new Intent("com.android.settings.panel.action.MEDIA_OUTPUT");startActivity(panel);return;}catch(Exception ignored){}new AlertDialog.Builder(this).setTitle("Samsung Media output").setMessage("Swipe down from the top-right, tap Media output, and select the two JBL speakers.").setPositiveButton("OK",null).show();}
     private void openPandora(){try{Intent i=getPackageManager().getLaunchIntentForPackage("com.pandora.android");if(i!=null){startActivity(i);return;}startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("market://details?id=com.pandora.android")));}catch(Exception e){toast("Pandora isn't installed.");}}
 
-    private void showTutorial(){new AlertDialog.Builder(this).setTitle("SyncLink v0.5.1").setMessage("We found the important distinction: CONNECTED does not mean Android will route two copies of the same audio where we ask.\n\n1. Samsung Dual Audio still handles two Bluetooth speakers.\n2. ‘Test Phone + Current Bluetooth’ now verifies whether SyncLink can independently route a second track to the built-in phone speaker.\n3. Auto Calibration only measures a route AFTER Android confirms the track really reached that route, and it uses three chirp passes with correlation instead of a single volume spike.\n4. If Samsung blocks the direct phone route, use Separate app sound: Pandora stays on Bluetooth while SyncLink’s captured mirror is assigned to This phone.\n\nThe delay controls now go to 1500 ms, but SyncLink will no longer pretend a delay can repair a routing failure.").setNegativeButton("Close",null).setPositiveButton("Got it",(d,w)->prefs.edit().putBoolean("tutorial_051",true).apply()).show();}
+    private void showTutorial(){new AlertDialog.Builder(this).setTitle("SyncLink v0.6.0").setMessage("v0.6 separates three things Android often makes look identical: Bluetooth-connected, exposed as an audio device, and actually carrying this track.\n\n1. Use Samsung Media output for the two Bluetooth leaders.\n2. Run Route Diagnostics to see what Android truly exposes to SyncLink.\n3. Test Phone + Current Bluetooth before calibrating; SyncLink verifies the real routed device.\n4. Calibration uses three chirp passes and a microphone-source fallback instead of trusting one volume spike.\n5. Pandora mirror now continues correctly after permission is granted and rejects extra outputs Android silently reroutes elsewhere.\n\nA delay slider can correct latency. It cannot repair a route Android refused to create.").setNegativeButton("Close",null).setPositiveButton("Got it",(d,w)->prefs.edit().putBoolean("tutorial_060",true).apply()).show();}
 
     @SuppressWarnings("deprecation")private BluetoothDevice deviceFrom(Intent i){if(i==null)return null;if(Build.VERSION.SDK_INT>=33)return i.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE,BluetoothDevice.class);return i.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);}
     private String norm(String s){return s==null?"":s.toLowerCase(Locale.US).replace("nick's","").replace("nick’s","").replaceAll("[^a-z0-9]","");}
